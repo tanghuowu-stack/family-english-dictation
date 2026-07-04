@@ -882,7 +882,9 @@
 
   <main id="app"></main>
 
-  <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"
+    integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz"
+    crossorigin="anonymous"></script>
   <script type="module" src="./src/cloudSyncUi.js"></script>
   <script>
     const STORAGE_KEY = "family_english_dictation_v1";
@@ -929,6 +931,18 @@
       correctTimesToExitWrongPool: 1
     };
 
+    // Fix R6：这个异常检测（低 Day 下某个固定词数全部已学完，大概率是同步/校验出错而不是真的学完）
+    // 原来在本文件和 cloudSyncUi.js 里各写了一份，阈值不一致（13 vs 20）。统一到这里一份，
+    // 20 是按默认每日新词数 30 反推的：595 个词全部学完至少需要 ceil(595/30)=20 天。
+    const SUSPICIOUS_ALL_LEARNED_WORD_COUNT = 595;
+    const SUSPICIOUS_ALL_LEARNED_MAX_DAY = 20;
+    function isSuspiciousAllWordsLearnedState(currentDay, totalWords, learnedWords) {
+      return Number(currentDay) <= SUSPICIOUS_ALL_LEARNED_MAX_DAY
+        && Number(totalWords) === SUSPICIOUS_ALL_LEARNED_WORD_COUNT
+        && Number(learnedWords) === SUSPICIOUS_ALL_LEARNED_WORD_COUNT;
+    }
+    window.isSuspiciousAllWordsLearnedState = isSuspiciousAllWordsLearnedState;
+
     let data = null;
     let viewName = "today";
     let dictationIndex = 0;
@@ -944,7 +958,13 @@
     }
 
     function todayDate() {
-      return new Date().toISOString().slice(0, 10);
+      // 用本地时区拼日期字符串，而不是 toISOString()（那是 UTC），
+      // 否则 UTC+8 用户在当地早上 0-8 点听写时，记录日期会被错误地记成前一天。
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      return year + "-" + month + "-" + day;
     }
 
     function nowIso() {
@@ -1026,7 +1046,8 @@
         isFocus: false,
         isStubborn: false,
         manualFocus: null,
-        manualStubborn: null
+        manualStubborn: null,
+        skipDelayedReviewSchedule: false
       };
     }
 
@@ -1060,7 +1081,12 @@
     function saveData() {
       if (!data) return;
       data.version = APP_VERSION;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (error) {
+        console.error("[saveData] localStorage.setItem 失败：", error);
+        alert("保存失败，可能是浏览器隐私模式限制或存储空间已满。请退出隐私模式或清理存储空间后重试，本次修改可能未保存。");
+      }
     }
 
     function validateAllDataImportObject(imported) {
@@ -1166,7 +1192,7 @@
       const currentDay = activeLibrary?.dailyRecords?.length
         ? Math.max(...activeLibrary.dailyRecords.map(record => Number(record.dayNumber || 0))) + 1
         : 1;
-      if (currentDay <= 13 && wordCount === 595 && learnedCount === 595) {
+      if (isSuspiciousAllWordsLearnedState(currentDay, wordCount, learnedCount)) {
         reasons.push("检测到低 Day 下 595 个词全部已学的异常状态");
       }
       try {
@@ -1260,6 +1286,7 @@
         word.correctStreakInWrongPool = Number(word.correctStreakInWrongPool || 0);
         word.manualFocus = word.manualFocus ?? null;
         word.manualStubborn = word.manualStubborn ?? null;
+        word.skipDelayedReviewSchedule = Boolean(word.skipDelayedReviewSchedule);
         applyWrongFlags(word);
       });
       lib.words.sort((a, b) => a.index - b.index);
@@ -1890,6 +1917,10 @@
           word.isPendingWrong = true;
           word.correctStreakInWrongPool = 0;
           clearWrongReview(word, 0);
+          // Fix R2：quickCalibrateProgress/addManualRecord 里勾选“跳过延迟复查”时会在 record 上
+          // 打 skipDelayedReviewSchedule 标记，这里把它落到 word 上，等这个词以后真正移出错词池、
+          // 准备安排 15 天后复查时才读取生效（见下面 movedOut 分支）。
+          if (record.skipDelayedReviewSchedule) word.skipDelayedReviewSchedule = true;
           if (pendingBefore.has(id)) continuedWrong.push(id);
           else newWrong.push(id);
         } else if (pendingBefore.has(id)) {
@@ -1898,7 +1929,12 @@
             word.isPendingWrong = false;
             word.correctStreakInWrongPool = 0;
             word.lastExitedWrongPoolDay = Number(record.dayNumber);
-            scheduleWrongReview(word, record.dayNumber, lib, 0);
+            if (word.skipDelayedReviewSchedule) {
+              clearWrongReview(word, 0);
+              word.skipDelayedReviewSchedule = false;
+            } else {
+              scheduleWrongReview(word, record.dayNumber, lib, 0);
+            }
             movedOut.push(id);
           }
         } else if (delayedSet.has(id)) {
@@ -2336,7 +2372,7 @@
     function renderLibrarySelect() {
       const select = document.getElementById("librarySelect");
       select.innerHTML = data.libraries.map(lib => {
-        return '<option value="' + lib.libraryId + '"' + (lib.libraryId === data.activeLibraryId ? " selected" : "") + '>' + escapeHtml(lib.libraryName) + '</option>';
+        return '<option value="' + escapeHtml(lib.libraryId) + '"' + (lib.libraryId === data.activeLibraryId ? " selected" : "") + '>' + escapeHtml(lib.libraryName) + '</option>';
       }).join("");
       select.onchange = () => switchLibrary(select.value);
     }
@@ -2483,19 +2519,19 @@
       return `
         <tr>
           <td>${word.index + 1}</td>
-          <td class="word-cell"><input data-word-text-id="${word.id}" value="${escapeHtml(word.word)}"></td>
-          <td class="meaning-cell"><input data-meaning-id="${word.id}" value="${escapeHtml(word.meaning)}"></td>
+          <td class="word-cell"><input data-word-text-id="${escapeHtml(word.id)}" value="${escapeHtml(word.word)}"></td>
+          <td class="meaning-cell"><input data-meaning-id="${escapeHtml(word.id)}" value="${escapeHtml(word.meaning)}"></td>
           <td>${word.firstLearnDay == null ? "-" : "Day " + word.firstLearnDay}</td>
           <td>${word.isPendingWrong ? '<span class="tag wrong">当前错词池</span>' : word.wrongCount > 0 ? '<span class="tag">历史错词</span>' : '<span class="tag ok">未错</span>'}</td>
           <td>${locked ? '<span class="tag">已学习，顺序锁定</span>' : `
             <div class="row">
-              <button class="ghost" data-move-word="${word.id}" data-move-direction="-1" ${unlearnedPosition <= 1 ? "disabled" : ""}>上移</button>
-              <button class="ghost" data-move-word="${word.id}" data-move-direction="1" ${unlearnedPosition >= unlearnedWords.length ? "disabled" : ""}>下移</button>
+              <button class="ghost" data-move-word="${escapeHtml(word.id)}" data-move-direction="-1" ${unlearnedPosition <= 1 ? "disabled" : ""}>上移</button>
+              <button class="ghost" data-move-word="${escapeHtml(word.id)}" data-move-direction="1" ${unlearnedPosition >= unlearnedWords.length ? "disabled" : ""}>下移</button>
               <span class="small muted">未学第</span>
-              <input style="width:92px" data-move-position="${word.id}" type="number" min="1" max="${unlearnedWords.length}" value="${unlearnedPosition}">
+              <input style="width:92px" data-move-position="${escapeHtml(word.id)}" type="number" min="1" max="${unlearnedWords.length}" value="${unlearnedPosition}">
             </div>
           `}</td>
-          <td><button class="danger" data-delete-word-id="${word.id}">删除</button></td>
+          <td><button class="danger" data-delete-word-id="${escapeHtml(word.id)}">删除</button></td>
         </tr>
       `;
     }
@@ -2875,7 +2911,7 @@
                   const sources = task.sourceMap[id] || ["new"];
                   return `
                     <tr>
-                      <td><input type="checkbox" data-wrong-check value="${id}"></td>
+                      <td><input type="checkbox" data-wrong-check value="${escapeHtml(id)}"></td>
                       <td>${word ? word.index + 1 : "-"}</td>
                       <td class="word-cell">${escapeHtml(word?.word || id)}</td>
                       <td>${escapeHtml(word?.meaning || "")}</td>
@@ -3235,7 +3271,7 @@
                 <tr>
                   <td data-label="英文" class="word-cell">${escapeHtml(word.word)}</td>
                   <td data-label="中文释义">${escapeHtml(word.meaning || "")}</td>
-                  <td data-label="错误次数"><input style="width:80px" type="number" min="0" data-wrong-count="${word.id}" value="${word.wrongCount}"></td>
+                  <td data-label="错误次数"><input style="width:80px" type="number" min="0" data-wrong-count="${escapeHtml(word.id)}" value="${word.wrongCount}"></td>
                   <td data-label="状态">
                     ${word.isPendingWrong ? '<span class="tag wrong">当前错词池</span>' : '<span class="tag">历史错词</span>'}
                     ${word.isFocus ? '<span class="tag review">重点</span>' : ''}
@@ -3245,8 +3281,8 @@
                   <td data-label="错词复查">${renderReviewStatus(word)}</td>
                   <td data-label="" class="actions-cell">
                     <div class="row">
-                      <button class="secondary" data-toggle-pending="${word.id}" title="移出错词池后，这个词不再每天强制复习，但历史错误次数仍保留。">${word.isPendingWrong ? "移出错词池" : "加入错词池"}</button>
-                      <button class="ghost" data-toggle-focus="${word.id}">${word.isFocus ? "取消重点" : "设为重点"}</button>
+                      <button class="secondary" data-toggle-pending="${escapeHtml(word.id)}" title="移出错词池后，这个词不再每天强制复习，但历史错误次数仍保留。">${word.isPendingWrong ? "移出错词池" : "加入错词池"}</button>
+                      <button class="ghost" data-toggle-focus="${escapeHtml(word.id)}">${word.isFocus ? "取消重点" : "设为重点"}</button>
                     </div>
                   </td>
                 </tr>
@@ -3439,7 +3475,7 @@
                 const word = getWordById(lib, id);
                 return `
                   <tr>
-                    <td><input type="checkbox" data-batch-wrong value="${id}"></td>
+                    <td><input type="checkbox" data-batch-wrong value="${escapeHtml(id)}"></td>
                     <td>${word ? word.index + 1 : "-"}</td>
                     <td class="word-cell">${escapeHtml(word?.word || id)}</td>
                     <td>${escapeHtml(word?.meaning || "")}</td>
@@ -3489,7 +3525,7 @@
               <tbody>
                 ${lib.words.map(word => `
                   <tr>
-                    <td><input type="checkbox" data-strict-new="${word.id}"></td>
+                    <td><input type="checkbox" data-strict-new="${escapeHtml(word.id)}"></td>
                     <td>${word.index + 1}</td>
                     <td class="word-cell">${escapeHtml(word.word)}</td>
                     <td>${escapeHtml(word.meaning || "")}</td>
@@ -3565,7 +3601,7 @@
                   const word = getWordById(lib, id);
                   return `
                     <tr>
-                      <td><input type="checkbox" data-strict-wrong value="${id}"></td>
+                      <td><input type="checkbox" data-strict-wrong value="${escapeHtml(id)}"></td>
                       <td class="word-cell">${escapeHtml(word?.word || id)}</td>
                       <td>${escapeHtml(word?.meaning || "")}</td>
                       <td>${sourceTagHtml(task.sourceMap[id] || ["new"])}</td>
@@ -3624,7 +3660,7 @@
                   <td>${word.index + 1}</td>
                   <td class="word-cell">${escapeHtml(word.word)}</td>
                   <td>${escapeHtml(word.meaning || "")}</td>
-                  <td><input style="width:80px" type="number" min="0" data-manual-count="${word.id}" value="${word.wrongCount}"></td>
+                  <td><input style="width:80px" type="number" min="0" data-manual-count="${escapeHtml(word.id)}" value="${word.wrongCount}"></td>
                   <td>
                     ${word.isPendingWrong ? '<span class="tag wrong">当前错词池</span>' : '<span class="tag">非当前错词</span>'}
                     ${word.isFocus ? '<span class="tag review">重点</span>' : ''}
@@ -3632,9 +3668,9 @@
                   </td>
                   <td class="actions-cell">
                     <div class="row">
-                      <button class="secondary" data-manual-pending="${word.id}">${word.isPendingWrong ? "移出" : "加入"}</button>
-                      <button class="ghost" data-manual-focus="${word.id}">${word.isFocus ? "取消重点" : "重点"}</button>
-                      <button class="ghost" data-manual-stubborn="${word.id}">${word.isStubborn ? "取消顽固" : "顽固"}</button>
+                      <button class="secondary" data-manual-pending="${escapeHtml(word.id)}">${word.isPendingWrong ? "移出" : "加入"}</button>
+                      <button class="ghost" data-manual-focus="${escapeHtml(word.id)}">${word.isFocus ? "取消重点" : "重点"}</button>
+                      <button class="ghost" data-manual-stubborn="${escapeHtml(word.id)}">${word.isStubborn ? "取消顽固" : "顽固"}</button>
                     </div>
                   </td>
                 </tr>
@@ -3746,7 +3782,7 @@
                   const word = getWordById(lib, id);
                   return `
                     <tr>
-                      <td><input type="checkbox" data-history-wrong value="${id}" ${wrongSet.has(id) ? "checked" : ""}></td>
+                      <td><input type="checkbox" data-history-wrong value="${escapeHtml(id)}" ${wrongSet.has(id) ? "checked" : ""}></td>
                       <td class="word-cell">${escapeHtml(word?.word || id)}</td>
                       <td>${escapeHtml(word?.meaning || "")}</td>
                       <td>${sourceTagHtml(getRecordSources(record, id))}</td>
@@ -3989,7 +4025,7 @@
                 const rate = total ? Math.round(((total - wrong) / total) * 100) : 0;
                 return `
                   <tr>
-                    <td data-label="日期"><input type="date" data-record-date="${record.recordId}" value="${escapeHtml(record.date || todayDate())}"></td>
+                    <td data-label="日期"><input type="date" data-record-date="${escapeHtml(record.recordId)}" value="${escapeHtml(record.date || todayDate())}"></td>
                     <td data-label="学习 Day">Day ${record.dayNumber}</td>
                     <td data-label="总词数">${total}</td>
                     <td data-label="错误">${wrong}</td>
@@ -3999,7 +4035,7 @@
                     <td data-label="新词">${counts.new}</td>
                     <td data-label="错词复习">${counts.wrong}</td>
                     <td data-label="到期复查">${counts.review}</td>
-                    <td data-label=""><button class="secondary" data-export-record-wrong="${record.recordId}">导出错词</button></td>
+                    <td data-label=""><button class="secondary" data-export-record-wrong="${escapeHtml(record.recordId)}">导出错词</button></td>
                   </tr>
                 `;
               }).join("")}

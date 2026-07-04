@@ -135,7 +135,12 @@ function validateLocalDataForAutoUpload(localData) {
   }
   const summary = summarizeLibrary(activeLibrary);
   if (summary.total <= 0) reasons.push("当前词库没有单词");
-  if (summary.currentDay <= 20 && summary.total === 595 && summary.learned === 595) {
+  // Fix R6：阈值判断统一读取 index.html 里定义的共享函数，避免两处各写一份、条件不一致
+  if (
+    typeof window.isSuspiciousAllWordsLearnedState === "function"
+      ? window.isSuspiciousAllWordsLearnedState(summary.currentDay, summary.total, summary.learned)
+      : (summary.currentDay <= 20 && summary.total === 595 && summary.learned === 595)
+  ) {
     reasons.push("检测到低 Day 下 595 个词全部已学的异常状态");
   }
   return { valid: reasons.length === 0, reasons, summary };
@@ -259,8 +264,15 @@ function requestAutoUploadLocalData(reason) {
 }
 
 // ── 撤销听写记录专用：先删云端对应 session，再上传本机最新快照 ────────────────────
-async function deleteSessionAndSync(libraryLocalId, sessionSourceLocalId) {
-  setAutoUploadStatus("记录已在本机删除，正在同步到云端...", false, false);
+// Fix R5：参照 iPad 同步失败重试的思路，失败后 5 秒自动重试一次，而不是直接放弃、
+// 只能靠用户去工具页手动补传。
+const DELETE_SESSION_RETRY_DELAY_MS = 5000;
+
+async function deleteSessionAndSync(libraryLocalId, sessionSourceLocalId, isRetry = false) {
+  setAutoUploadStatus(
+    isRetry ? "正在重试将撤销的记录同步到云端..." : "记录已在本机删除，正在同步到云端...",
+    false, false
+  );
   try {
     const user = await getCurrentUser();
     if (!user) {
@@ -270,6 +282,12 @@ async function deleteSessionAndSync(libraryLocalId, sessionSourceLocalId) {
     await deleteCloudSessionBySourceLocalId(libraryLocalId, sessionSourceLocalId);
     requestAutoUploadLocalData("undo-record");
   } catch (error) {
+    if (!isRetry) {
+      console.warn("[cloudSync] 撤销记录同步云端失败，5 秒后自动重试一次：", error?.message || error);
+      setAutoUploadStatus("本机记录已删除，云端同步失败，5 秒后自动重试...", true, false);
+      setTimeout(() => deleteSessionAndSync(libraryLocalId, sessionSourceLocalId, true), DELETE_SESSION_RETRY_DELAY_MS);
+      return;
+    }
     setAutoUploadStatus(
       "本机记录已删除，但云端同步失败：" + (error.message || "网络错误") + "。请稍后在工具页手动上传。",
       true, false
@@ -421,7 +439,7 @@ async function diagnoseLocalAndCloudData(elements) {
   setMessage(elements.actionMessage, "正在执行只读诊断...", false);
   try {
     const localData = getLocalDataSnapshot();
-    const result = await downloadCloudDataForLocalStorage(localData?.version || "1.0.0");
+    const result = await downloadCloudDataForLocalStorage(localData?.version || "1.0.0", localData?.activeLibraryId || null);
     const validation = validateRestoredData(result.restoredData, result.cloudCounts || {});
     elements.diagnosticOutput.textContent = formatDiagnosticReport(localData, result, validation);
     elements.diagnosticOutput.hidden = false;
@@ -467,7 +485,7 @@ async function downloadCloudData(elements) {
   setMessage(elements.actionMessage, "正在读取并还原云端数据，请不要关闭页面...", false);
   try {
     const currentLocalData = getLocalDataSnapshot();
-    const result = await downloadCloudDataForLocalStorage(currentLocalData?.version || "1.0.0");
+    const result = await downloadCloudDataForLocalStorage(currentLocalData?.version || "1.0.0", currentLocalData?.activeLibraryId || null);
     const validation = validateRestoredData(result.restoredData, result.cloudCounts || {});
     if (!validation.valid) {
       setMessage(
@@ -731,10 +749,19 @@ async function autoSyncCloudToLocalIfNewer() {
       }
     }
 
-    const result = await downloadCloudDataForLocalStorage(currentLocalData?.version || "1.0.0");
+    const result = await downloadCloudDataForLocalStorage(currentLocalData?.version || "1.0.0", currentLocalData?.activeLibraryId || null);
     const validation = validateRestoredData(result.restoredData, result.cloudCounts || {});
     if (!validation.valid) {
       console.warn("[cloudSync] 自动同步下载的数据未通过校验，已跳过本次覆盖：", validation.reasons);
+      return;
+    }
+
+    // Fix R9：downloadCloudDataForLocalStorage 是一系列 await 网络请求，耗时较长。
+    // 如果用户恰好在这段时间内完成并提交了一次听写，_autoUploadInProgress 会在这期间被置 true。
+    // 顶部的前置检查发生在下载开始之前，读不到这个后来才出现的状态，这里在真正覆盖本机数据前
+    // 再检查一次，避免用刚下载的（可能还不包含这次听写的）云端数据覆盖掉本机刚提交的新记录。
+    if (_autoUploadInProgress) {
+      console.warn("[cloudSync] 拉取完成时检测到本机正在上传（提交了新的听写记录），放弃本次覆盖以避免冲突");
       return;
     }
 

@@ -410,6 +410,10 @@ export async function uploadLocalDataToCloud(localData) {
         last_exited_wrong_pool_day: positiveDayOrNull(word.lastExitedWrongPoolDay),
         manual_focus: booleanOrNull(word.manualFocus),
         manual_stubborn: booleanOrNull(word.manualStubborn),
+        // Fix R10：这两个字段原来只存在本机 localStorage，换设备/恢复数据后会丢失，
+        // 导致 R2 修好的“跳过延迟复查”设置在另一台设备上失效。
+        skip_delayed_review_schedule: booleanOrNull(word.skipDelayedReviewSchedule),
+        delayed_review_postponed: booleanOrNull(word.delayedReviewPostponed),
         updated_at: new Date().toISOString()
       }];
     });
@@ -702,9 +706,11 @@ function restoreProgressOnWord(word, progress) {
   word.manualStubborn = booleanOrNull(progress.manual_stubborn);
   word.isFocus = word.manualFocus == null ? word.wrongCount >= 2 : word.manualFocus;
   word.isStubborn = word.manualStubborn == null ? word.wrongCount >= 3 : word.manualStubborn;
+  word.skipDelayedReviewSchedule = Boolean(progress.skip_delayed_review_schedule);
+  word.delayedReviewPostponed = Boolean(progress.delayed_review_postponed);
 }
 
-export async function downloadCloudDataForLocalStorage(appVersion = "1.0.0") {
+export async function downloadCloudDataForLocalStorage(appVersion = "1.0.0", preferredActiveLibraryLocalId = null) {
   const client = requireCloudClient();
   const user = await getCurrentUser();
   if (!user) throw new Error("请先登录云端");
@@ -765,7 +771,7 @@ export async function downloadCloudDataForLocalStorage(appVersion = "1.0.0") {
   const cloudProgress = await fetchAllCloudRows(
     client,
     "user_word_progress",
-    "id,user_id,library_id,word_id,first_learn_day,wrong_count,is_pending_wrong,correct_streak,wrong_review_due_day,wrong_review_stage,last_exited_wrong_pool_day,manual_focus,manual_stubborn,created_at,updated_at",
+    "id,user_id,library_id,word_id,first_learn_day,wrong_count,is_pending_wrong,correct_streak,wrong_review_due_day,wrong_review_stage,last_exited_wrong_pool_day,manual_focus,manual_stubborn,skip_delayed_review_schedule,delayed_review_postponed,created_at,updated_at",
     query => query.eq("user_id", user.id)
   );
   result.cloudCounts = {
@@ -844,7 +850,8 @@ export async function downloadCloudDataForLocalStorage(appVersion = "1.0.0") {
           isFocus: false,
           isStubborn: false,
           manualFocus: null,
-          manualStubborn: null
+          manualStubborn: null,
+          skipDelayedReviewSchedule: false
         });
       });
   });
@@ -981,9 +988,14 @@ export async function downloadCloudDataForLocalStorage(appVersion = "1.0.0") {
   });
 
   result.libraries = restoredLibraries.length;
+  // Fix R4：自动拉取不应该把用户当前正在看的词库切换成云端返回的第一个词库。
+  // 只要本机当前激活的词库在恢复结果里仍然存在，就保持它继续激活；只有在它已经不存在时
+  // （比如那个词库被删了）才退回到第一个词库。
+  const preferredStillExists = preferredActiveLibraryLocalId
+    && restoredLibraries.some(lib => lib.libraryId === preferredActiveLibraryLocalId);
   result.restoredData = {
     version: appVersion || "1.0.0",
-    activeLibraryId: restoredLibraries[0]?.libraryId || null,
+    activeLibraryId: preferredStillExists ? preferredActiveLibraryLocalId : (restoredLibraries[0]?.libraryId || null),
     libraries: restoredLibraries
   };
   return result;
