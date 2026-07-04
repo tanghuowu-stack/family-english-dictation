@@ -713,3 +713,82 @@ CREATE INDEX IF NOT EXISTS idx_user_word_progress_user_updated
 **移动端/PWA**：图标缓存问题根源已确认——iOS对已安装图标不会自动刷新，是平台行为不是配置错误，以后换图标只能删除重装；`manifest.webmanifest`的主题色还是改版前的蓝色，与现在绿色UI不一致；viewport缺`viewport-fit=cover`；手动校准三张表没套手机端卡片布局；无service worker断网白屏。
 
 **核心算法结论（好消息）**：错词复查状态机逻辑自洽，`recalculateLibraryState`全量重放保证一致性，日期判断基于逻辑Day不受时区影响。真正的洞是S5和R2，其余核心算法没有发现问题。
+
+---
+
+## 窗口11：PWA代码版本检测机制 + S5修复
+
+### PWA代码版本检测（解决"部署新代码后PWA窗口卡在旧版本"）
+
+排查发现这和之前的"图标不刷新"是两个不同层面的问题：图标缓存是iOS平台对已安装图标图案本身的限制（无解，只能删除重装），但这次是PWA窗口运行的JS代码本身卡旧版本——因为iOS主屏幕独立PWA窗口没有Service Worker介入的情况下，会优先用WebKit内部缓存/快照渲染，不像普通Safari标签页那样老实按Cache-Control重新校验。
+
+**决策：采用"版本号轮询+强制刷新"方案，不引入Service Worker**（避免给项目增加一套更复杂、更难调试的缓存机制，之前几轮教训都是"保护机制自己制造新问题"）。
+
+**实现方式**（有一处对最初方案的关键调整）：
+- 最初设想是"页面加载时fetch一次version.json存起来当作当前版本"，但这个逻辑有漏洞——如果PWA卡在旧代码，旧代码执行这个fetch本身不会被缓存，会老实拿到最新版本号，导致"当前版本"从一开始就被错误记成和"最新版本"一样，永远检测不出差异
+- 改为：构建时（`vite.config.js`）用时间戳生成版本号，通过`define`直接编译进JS bundle成为常量`__APP_BUILD_VERSION__`（这样版本号是这份代码从诞生起就带着的"身份证"，不依赖运行时请求），同时写入`public/version.json`
+- 运行时在load/visibilitychange/3分钟定时器这几个已有触发时机，请求最新`version.json`（`cache: "no-store"`+时间戳参数双重防缓存）跟内置常量比对，不一致就toast提示+刷新
+- 新函数`checkAppVersionAndReloadIfStale`完全独立于`checkCloudFreshness`/`autoSyncCloudToLocalIfNewer`，只是复用同样的触发时机和`showSyncToast`样式，不与现有数据同步逻辑混在一起
+
+**验证过程中的一个重要认知**：这套机制生效的前提是"当前PWA窗口本身运行的就是包含这套检测功能的新代码"——如果PWA本来就卡在这次修复之前的旧代码，它自己是不可能"发现自己该更新"的（旧代码里根本没这个功能）。所以第一次启用**必须手动删除旧图标、重新添加一次**作为干净起点，之后才能验证"以后再也不用手动删装"这个效果。验证时确实一度因为时序问题（重装图标时机在测试部署之后）误以为没生效，排查后确认是正常现象，不是bug。
+
+**结论**：机制已验证生效——后续部署新代码后，PWA会自动检测到版本差异并提示刷新，不再需要手动删除重装图标。
+
+### S5修复：手动"重点/顽固"标记不参与云端同步
+
+读代码后发现一个好消息：本地重算逻辑（`applyWrongFlags`、`recalculateLibraryState`、`manualUpdateWrongPool`）其实早就正确保留/尊重这两个手动标记字段了，之前审查报告里担心的"历史重算会冲掉手动标记"这部分实际不成立。真正的缺口只在云端同步层：
+
+- 上传：`progressRows`没有包含`manual_focus`/`manual_stubborn`字段，schema里也没有这两列
+- 恢复：`restoreProgressOnWord`没有读取这两个字段，只会按`wrongCount`阈值重新推导，导致手动标记一旦触发云端拉取就会丢失
+
+**修复**：`src/cloudRepository.js`——上传时新增这两个字段（null=未手动设置，true/false=手动覆盖）；恢复时优先读取云端这两个字段，为null才退回阈值推导。新增migration `add_manual_focus_stubborn.sql`，同步更新了`schema.sql`供新装参考。
+
+**需要手动执行的migration**（新增两个可空列，不影响现有数据）：
+```sql
+alter table public.user_word_progress
+  add column if not exists manual_focus boolean;
+alter table public.user_word_progress
+  add column if not exists manual_stubborn boolean;
+```
+
+**部署**：commit `19a16dc`。
+
+---
+
+## 项目当前整体状态（截至这次更新）
+
+**已解决**：自动双向云端同步（含听写/撤销/补录/错词池调整全部触发点）、多词库死循环(S1)、补录数据丢失(S2)、拉取覆盖本地未上传数据(S4)、pendingCloudUpload自锁、iPad同步失败重试、PWA同步死循环、PWA代码版本检测、S5手动标记同步、S3上传原子性加固、S6单条坏记录不再拖垮整体同步、全站界面美化+移动端响应式适配。
+
+**仍未处理（完整清单见上方"窗口10"章节，优先级较低，暂缓）**：R1-R10（时区显示、性能优化、死代码清理等）。
+
+**建议**：不需要再做全面代码审查——上次审查已经很全面，剩余问题都已记录在案，不是"没发现"而是"选择暂缓"。后续更有效的方式是靠实际使用去暴露新问题，而不是重复静态审查。
+
+---
+
+## 窗口12：S3（上传原子性加固）+ S6（单条坏记录不再拖垮整体同步）
+
+### S3：上传非原子操作的竞态窗口
+
+`uploadLocalDataToCloud`本身仍是5步串行写入（不是数据库事务）——评估后放弃"改成Postgres RPC事务"（改动量大、风险高，需要在数据库里重写多表写入+外键解析逻辑），采用轻量的"批次标记+完整性检测"：
+
+- 新增`libraries.upload_batch_id`/`upload_complete`两列。每次上传一个词库时，Step1（写libraries行）就置`upload_complete=false`；等words/sessions/user_word_progress三个核心步骤全部无失败后才置`true`。
+- 由于底层写入是幂等upsert，中途失败后下次成功上传会自动补全数据并把标记转回`true`——具备自愈能力，不需要额外的清理脚本。
+- 下载/诊断时读出这个标记，`upload_complete===false`会`console.warn`并写进诊断报告，提示去发起那次上传的设备重新点一次上传。
+- 明确不处理跨设备/跨标签页同时上传的并发场景（按需求，这个场景概率低且用户几乎不会真的这样操作）。
+
+**需要手动执行的migration**（新增两个可空列，不影响现有数据；`upload_complete`默认值`true`是为了不把迁移前的旧数据误判为不完整）：
+```sql
+alter table public.libraries add column if not exists upload_batch_id uuid;
+alter table public.libraries add column if not exists upload_complete boolean default true;
+```
+
+### S6：一条坏云端记录导致自动同步永久静默失效
+
+`downloadCloudDataForLocalStorage`本来就只跳过引用了缺失单词/词库的那一条坏记录，真正的问题在下游：`validateCloudRestoredDataForImport`只要发现"恢复的听写记录数"和"云端记录数"对不上，就会判定整批恢复数据invalid，导致`autoSyncCloudToLocalIfNewer`静默放弃整次同步。
+
+**修复**：
+- 跳过时精确记录"跳过了几条、影响了多少单词"（`skippedSessionCount`/`skippedSessionAffectedWordCount`），传给校验函数用来把这部分预期内的差异扣除掉，不再一条坏记录拖垮整批数据。
+- 所有跳过/失败路径都补上了具体的`console.warn`（跳过原因、Day、缺失的单词ID），不再有静默吞掉的catch。
+- 自动同步成功但检测到跳过记录或上传未完整时，弹一个不打断使用的toast提示"部分历史数据可能不完整，建议手动检查"。
+
+**部署**：见下次commit。

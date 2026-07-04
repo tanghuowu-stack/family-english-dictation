@@ -330,6 +330,13 @@ function formatDiagnosticReport(localData, restoreResult, validation) {
     "is_pending_wrong = true 数量：" + Number(cloud.pendingWrongProgress || 0),
     "当前用户 id：" + (cloud.userId || "-"),
     "当前词库数量：" + Number(cloud.libraries || 0),
+    // Fix S3：upload_complete === false 说明上一次上传中途失败/被打断过，云端可能停留在
+    // 不完整的中间状态；这里明确列出，提醒用户去发起那次上传的设备重新点一次上传。
+    "上次上传是否有未完整跑完的词库：" + (cloud.hasIncompleteUpload
+      ? "是（" + (cloud.incompleteUploadLibraryNames || []).join("、") + "）"
+      : "否"),
+    // Fix S6：因引用缺失单词/词库被跳过的听写记录数量，跳过原因已在 console.warn 中给出。
+    "因引用缺失数据被跳过的听写记录数：" + Number(cloud.skippedSessionCount || 0),
     "",
     "恢复预览摘要：",
     "restoredData 当前 Day：" + restored.currentDay,
@@ -737,7 +744,14 @@ async function autoSyncCloudToLocalIfNewer() {
     if (typeof window.updateLocalLibraryUpdatedAt === "function") {
       window.updateLocalLibraryUpdatedAt(new Date().toISOString());
     }
-    showSyncToast("已同步最新数据");
+    // Fix S6/S3：数据已经正常同步下载，但云端存在被跳过的坏记录，或者有词库上次上传未完整跑完——
+    // 不阻塞本次同步，只用一个不打断使用的 toast 提示用户，技术细节已经在 console.warn 里了。
+    const cloudCounts = result.cloudCounts || {};
+    if (Number(cloudCounts.skippedSessionCount || 0) > 0 || cloudCounts.hasIncompleteUpload) {
+      showSyncToast("已同步最新数据，但部分历史数据可能不完整，建议手动检查");
+    } else {
+      showSyncToast("已同步最新数据");
+    }
     setTimeout(() => window.location.reload(), 500);
   } catch (error) {
     // Fix iPad：不再完全静默，留一条 console.warn 方便以后排查"为什么没自动同步"

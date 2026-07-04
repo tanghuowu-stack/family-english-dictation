@@ -115,6 +115,18 @@ function booleanOrNull(value) {
   return value === null || value === undefined ? null : Boolean(value);
 }
 
+// Fix S3：上传批次标记，用于检测"这批数据是否完整跑完"，而不是简单地认为
+// 只要 sessions 表有记录就是完整的。真正的跨表事务需要 Postgres RPC 函数改动量较大，
+// 这里用轻量的"开始置 false，核心步骤全部成功后置 true"来做完整性检测+自愈。
+function generateUploadBatchId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, char => {
+    const random = Math.random() * 16 | 0;
+    const value = char === "x" ? random : (random & 0x3 | 0x8);
+    return value.toString(16);
+  });
+}
+
 function validTimestamp(value, fallback = null) {
   if (!value) return fallback;
   const timestamp = new Date(value);
@@ -267,6 +279,7 @@ export async function uploadLocalDataToCloud(localData) {
       continue;
     }
 
+    const uploadBatchId = generateUploadBatchId();
     try {
       const { data, error } = await client
         .from("libraries")
@@ -276,6 +289,8 @@ export async function uploadLocalDataToCloud(localData) {
           name: String(library.libraryName || "未命名词库"),
           description: null,
           visibility: "private",
+          upload_batch_id: uploadBatchId,
+          upload_complete: false,
           updated_at: new Date().toISOString()
         }, { onConflict: "owner_id,source_local_id" })
         .select("id,source_local_id")
@@ -306,6 +321,10 @@ export async function uploadLocalDataToCloud(localData) {
     } catch (error) {
       addFailure(result, 1, "词库设置“" + (library.libraryName || localLibraryId) + "”", error);
     }
+
+    // Fix S3：从这里开始到 user_word_progress 写完为止的三步是本次上传批次的核心内容，
+    // 记录写入前的失败计数，写完后对比，用来判断这批数据是否完整跑完。
+    const coreStepsFailedBefore = result.failed;
 
     const localWords = Array.isArray(library.words) ? library.words : [];
     const wordRows = localWords.map((word, index) => ({
@@ -401,6 +420,30 @@ export async function uploadLocalDataToCloud(localData) {
       } catch (error) {
         addFailure(result, batch.length, "词库“" + (library.libraryName || localLibraryId) + "”的学习进度", error);
       }
+    }
+
+    // Fix S3：words/sessions/progress 三步核心写入全部无失败，才把这批标记为完整；
+    // 只在 upload_batch_id 仍等于本次批次时才更新，避免覆盖一个更晚发起的上传批次的状态。
+    if (result.failed === coreStepsFailedBefore) {
+      try {
+        const { error: markCompleteError } = await client
+          .from("libraries")
+          .update({ upload_complete: true, updated_at: new Date().toISOString() })
+          .eq("id", cloudLibrary.id)
+          .eq("upload_batch_id", uploadBatchId);
+        if (markCompleteError) throw markCompleteError;
+      } catch (error) {
+        console.warn(
+          "[cloudSync] 上传批次完整性标记写入失败（不影响本次已上传的数据，但下次检测可能误判为不完整）：",
+          library.libraryName || localLibraryId, error?.message || error
+        );
+      }
+    } else {
+      console.warn(
+        "[cloudSync] 词库“" + (library.libraryName || localLibraryId) + "”本次上传核心步骤（单词/听写记录/学习进度）" +
+        "存在失败，upload_complete 保持 false，等待下次成功上传后自动补全：",
+        result.failureReasons.slice(-3)
+      );
     }
 
     // ── 安全清理云端本词库中已被本地删除的单词和听写记录 ──────────────────────────
@@ -681,10 +724,21 @@ export async function downloadCloudDataForLocalStorage(appVersion = "1.0.0") {
   const cloudLibraries = await fetchAllCloudRows(
     client,
     "libraries",
-    "id,source_local_id,name,description,visibility,created_at,updated_at",
+    "id,source_local_id,name,description,visibility,upload_complete,created_at,updated_at",
     query => query.eq("owner_id", user.id)
   );
   if (!cloudLibraries.length) throw new Error("云端没有可恢复的词库，本地数据未被覆盖");
+
+  // Fix S3：upload_complete === false 说明这个词库上一次上传中途失败/被打断过。
+  // 不阻止本次下载（云端现有数据仍然是目前能拿到的最好数据），但要清楚地记录下来，
+  // 方便用户/开发者判断"要不要回那台设备重新点一次上传"。
+  const incompleteUploadLibraries = cloudLibraries.filter(library => library.upload_complete === false);
+  if (incompleteUploadLibraries.length) {
+    console.warn(
+      "[cloudSync] 检测到以下词库的上一次云端上传未完整跑完（可能中途网络中断或应用被杀死）：",
+      incompleteUploadLibraries.map(library => library.name || library.id)
+    );
+  }
 
   const cloudLibraryIds = cloudLibraries.map(library => library.id);
   const cloudWords = [];
@@ -725,7 +779,9 @@ export async function downloadCloudDataForLocalStorage(appVersion = "1.0.0") {
     firstLearnDayNonNullProgress: cloudProgress.filter(progress => progress.first_learn_day != null).length,
     firstLearnDayValidProgress: cloudProgress.filter(progress => positiveDayOrNull(progress.first_learn_day) != null).length,
     pendingWrongProgress: cloudProgress.filter(progress => progress.is_pending_wrong === true).length,
-    userId: user.id
+    userId: user.id,
+    hasIncompleteUpload: incompleteUploadLibraries.length > 0,
+    incompleteUploadLibraryNames: incompleteUploadLibraries.map(library => library.name || library.id)
   };
   const knownCloudWordIds = new Set(cloudWords.map(word => word.id));
   const derivedLearnedCloudWordIds = new Set();
@@ -798,7 +854,11 @@ export async function downloadCloudDataForLocalStorage(appVersion = "1.0.0") {
     if (!cloudWordToLocalId.has(progress.word_id)) {
       result.skipped += 1;
       result.failed += 1;
-      result.failureReasons.push("学习进度引用了不存在的云端单词：" + progress.word_id);
+      const reason = "学习进度引用了不存在的云端单词：" + progress.word_id;
+      result.failureReasons.push(reason);
+      // Fix S6：只跳过这一条坏的 progress 记录，不影响其余数据继续正常恢复；
+      // 必须留下明确日志，避免以后再遇到类似问题只能靠人工推理代码定位。
+      console.warn("[cloudSync] 已跳过一条学习进度记录（不影响其余数据恢复）：", reason);
       return;
     }
     progressByCloudWordId.set(progress.word_id, progress);
@@ -814,11 +874,21 @@ export async function downloadCloudDataForLocalStorage(appVersion = "1.0.0") {
   const settingsByLibraryId = new Map(cloudSettings.map(settings => [settings.library_id, settings]));
   const sessionsByLibraryId = new Map();
   cloudLibraries.forEach(library => sessionsByLibraryId.set(library.id, []));
+  // Fix S6：单条听写记录因为引用了缺失的词库/单词而无法还原时，只跳过这一条，
+  // 其余记录和数据仍然正常同步下载。这里额外记录"跳过了多少条、影响了多少个单词"，
+  // 供 validateCloudRestoredDataForImport 在做数量核对时把这部分正常跳过的差异排除掉，
+  // 而不是因为一条坏记录就把整批恢复数据判定为 invalid、导致自动同步永久静默失效。
+  let skippedSessionCount = 0;
+  let skippedSessionAffectedWordCount = 0;
   cloudSessions.forEach(session => {
     if (!sessionsByLibraryId.has(session.library_id)) {
       result.skipped += 1;
       result.failed += 1;
-      result.failureReasons.push("听写记录引用了不存在的云端词库：" + session.id);
+      skippedSessionCount += 1;
+      skippedSessionAffectedWordCount += uniqueIds(session.task_word_ids).length;
+      const reason = "听写记录引用了不存在的云端词库：" + session.id;
+      result.failureReasons.push(reason);
+      console.warn("[cloudSync] 已跳过一条听写记录（其余记录仍正常恢复）：", reason);
       return;
     }
 
@@ -839,9 +909,13 @@ export async function downloadCloudDataForLocalStorage(appVersion = "1.0.0") {
     if (missing.size) {
       result.skipped += 1;
       result.failed += 1;
-      result.failureReasons.push(
-        "Day " + session.day_number + " 有 " + missing.size + " 个单词无法还原，已跳过该听写记录"
-      );
+      skippedSessionCount += 1;
+      skippedSessionAffectedWordCount += uniqueIds(session.task_word_ids).length;
+      const reason =
+        "Day " + session.day_number + " 有 " + missing.size + " 个单词无法还原（可能是单词已被删除但记录还在），已跳过该听写记录：" +
+        Array.from(missing).join(",");
+      result.failureReasons.push(reason);
+      console.warn("[cloudSync] 已跳过一条听写记录（其余记录仍正常恢复）：", reason);
       return;
     }
 
@@ -864,6 +938,8 @@ export async function downloadCloudDataForLocalStorage(appVersion = "1.0.0") {
     sessionsByLibraryId.get(session.library_id).push(record);
     result.sessions += 1;
   });
+  result.cloudCounts.skippedSessionCount = skippedSessionCount;
+  result.cloudCounts.skippedSessionAffectedWordCount = skippedSessionAffectedWordCount;
 
   const restoredLibraries = cloudLibraries.map(cloudLibrary => {
     const words = localWordsByLibrary.get(cloudLibrary.id) || [];

@@ -1111,14 +1111,35 @@
       if (Number(cloudCounts.words || 0) > 0 && wordCount !== Number(cloudCounts.words)) {
         reasons.push("恢复单词数 " + wordCount + " 与云端 words 数 " + cloudCounts.words + " 不一致");
       }
-      if (Number(cloudCounts.sessions || 0) > 0 && !sessionCount) {
+      // Fix S6：downloadCloudDataForLocalStorage 遇到"某条听写记录引用了已不存在的单词/词库"时，
+      // 只会跳过那一条坏记录（并在 console.warn 里留下具体原因），其余数据仍正常恢复。
+      // 这里用 skippedSessionCount 把这部分“预期内、已有日志记录”的差异排除掉，
+      // 不能再让一条坏记录导致整批恢复数据被判定为 invalid、进而让自动同步永久静默失效。
+      const skippedSessionCount = Number(cloudCounts.skippedSessionCount || 0);
+      const skippedSessionAffectedWordCount = Number(cloudCounts.skippedSessionAffectedWordCount || 0);
+      const expectedSessionCount = Math.max(0, Number(cloudCounts.sessions || 0) - skippedSessionCount);
+      if (expectedSessionCount > 0 && !sessionCount) {
         reasons.push("云端有听写记录，但恢复数据中没有 dailyRecords");
       }
-      if (Number(cloudCounts.sessions || 0) !== sessionCount) {
-        reasons.push("恢复听写记录数 " + sessionCount + " 与云端记录数 " + Number(cloudCounts.sessions || 0) + " 不一致");
+      if (expectedSessionCount !== sessionCount) {
+        reasons.push(
+          "恢复听写记录数 " + sessionCount + " 与云端记录数（已扣除 " + skippedSessionCount +
+          " 条因引用缺失单词/词库而被跳过的记录）" + expectedSessionCount + " 不一致"
+        );
+      } else if (skippedSessionCount > 0) {
+        console.warn(
+          "[cloudSync] 本次恢复有 " + skippedSessionCount + " 条听写记录因引用缺失单词/词库被跳过，" +
+          "其余数据仍正常恢复，详情见 downloadCloudDataForLocalStorage 的 console.warn 日志。"
+        );
       }
-      if (cloudCounts.derivedLearned != null && learnedCount !== Number(cloudCounts.derivedLearned)) {
-        reasons.push("恢复已学词数 " + learnedCount + " 与云端进度/记录推导数 " + cloudCounts.derivedLearned + " 不一致");
+      if (cloudCounts.derivedLearned != null) {
+        const minExpectedLearned = Math.max(0, Number(cloudCounts.derivedLearned) - skippedSessionAffectedWordCount);
+        if (learnedCount < minExpectedLearned || learnedCount > Number(cloudCounts.derivedLearned)) {
+          reasons.push(
+            "恢复已学词数 " + learnedCount + " 与云端进度/记录推导数 " + cloudCounts.derivedLearned +
+            "（容许因跳过记录减少至多 " + skippedSessionAffectedWordCount + "）不一致"
+          );
+        }
       }
       if (!restoredData.activeLibraryId) {
         reasons.push("缺少 activeLibraryId");
