@@ -912,13 +912,9 @@
       }
     ];
     const DEFAULT_SETTINGS = {
-      earlyPhaseDays: 15,
-      earlyNewWordsPerDay: 30,
-      laterNewWordsPerDay: 20,
       reviewDelayDays: 15,
       dailyTargetWords: 30,
       dailyReviewWords: 30,
-      dailyMaxWords: 60,
       countMode: "split-new-review",
       pauseNewWords: false,
       playOrder: "ordered",
@@ -1744,7 +1740,7 @@
       }
       const lib = getCurrentLibrary();
       const utterance = new SpeechSynthesisUtterance(String(wordText || ""));
-      utterance.lang = lib?.settings?.speechLang || "en-US";
+      utterance.lang = "en-US";
       utterance.rate = clampNumber(lib?.settings?.speechRate, 0.5, 1.5, 0.9);
       const voice = getPreferredSpeechVoice(lib?.settings || {});
       if (voice) {
@@ -2079,7 +2075,7 @@
         window.cloudSync.requestAutoUploadLocalData("manual-record-added");
       }
       alert("已保存补录记录，并完成重新计算。");
-      renderManualUpdateView();
+      renderStrictManualTab();
     }
 
     function buildManualBackfillTask(dayNumber, customNewCount = null) {
@@ -2237,7 +2233,7 @@
         window.cloudSync.requestAutoUploadLocalData("quick-calibrate");
       }
       alert("快速校准完成。");
-      renderManualUpdateView();
+      renderQuickCalibrateTab();
     }
 
     function manualUpdateWrongPool(wordId, updates) {
@@ -2505,17 +2501,21 @@
               </tr>
             </thead>
             <tbody>
-              ${lib.words.map(word => renderWordRow(lib, word)).join("")}
+              ${(() => {
+                const lockedWordIds = getLockedWordIdSet(lib);
+                const unlearnedWords = getSortableUnlearnedWords(lib, lockedWordIds);
+                const unlearnedPositionById = new Map(unlearnedWords.map((word, i) => [word.id, i + 1]));
+                return lib.words.map(word => renderWordRow(lib, word, lockedWordIds, unlearnedWords, unlearnedPositionById)).join("");
+              })()}
             </tbody>
           </table>
         </div>
       `;
     }
 
-    function renderWordRow(lib, word) {
-      const locked = isWordLearnedLocked(lib, word);
-      const unlearnedWords = getSortableUnlearnedWords(lib);
-      const unlearnedPosition = unlearnedWords.findIndex(item => item.id === word.id) + 1;
+    function renderWordRow(lib, word, lockedWordIds, unlearnedWords, unlearnedPositionById) {
+      const locked = lockedWordIds.has(word.id);
+      const unlearnedPosition = unlearnedPositionById.get(word.id) || 0;
       return `
         <tr>
           <td>${word.index + 1}</td>
@@ -2543,9 +2543,25 @@
       });
     }
 
-    function getSortableUnlearnedWords(lib) {
+    function getLockedWordIdSet(lib) {
+      const lockedWordIds = new Set();
+      lib.words.forEach(word => {
+        if (word.firstLearnDay != null) lockedWordIds.add(word.id);
+      });
+      lib.dailyRecords.forEach(record => {
+        ["newWordIds", "taskWordIds"].forEach(key => {
+          if (Array.isArray(record[key])) {
+            record[key].forEach(id => lockedWordIds.add(id));
+          }
+        });
+      });
+      return lockedWordIds;
+    }
+
+    function getSortableUnlearnedWords(lib, lockedWordIds) {
+      const locked = lockedWordIds || getLockedWordIdSet(lib);
       return lib.words
-        .filter(word => !isWordLearnedLocked(lib, word))
+        .filter(word => !locked.has(word.id))
         .sort((a, b) => a.index - b.index);
     }
 
@@ -3321,32 +3337,6 @@
       });
     }
 
-    function renderManualUpdateView() {
-      const lib = getCurrentLibrary();
-      document.getElementById("app").innerHTML = `
-        <div class="grid">
-          <section class="card span-12">
-            <h2>手动校准</h2>
-            <div class="notice small">连续按天补录适合已经知道 Day 1、Day 2、Day 3 分别错了哪些词的情况。每天保存后，系统会按原规则自动处理错词池、错词本和后续复习。</div>
-          </section>
-          <section class="card span-12">
-            <div class="tabs">
-              <button class="secondary" data-manual-tab="batch">连续按天补录</button>
-              <button class="secondary" data-manual-tab="strict">高级：指定新词补录</button>
-              <button class="secondary" data-manual-tab="quick">模式 2：快速校准已学进度</button>
-              <button class="secondary" data-manual-tab="pool">模式 3：手动维护错词池</button>
-              <button class="secondary" data-manual-tab="history">历史记录修改</button>
-            </div>
-            <div id="manualContent"></div>
-          </section>
-        </div>
-      `;
-      document.querySelectorAll("[data-manual-tab]").forEach(button => {
-        button.onclick = () => renderManualTab(button.dataset.manualTab);
-      });
-      renderManualTab("batch");
-    }
-
     function renderManualTab(tab) {
       if (tab === "batch") renderBatchManualTab();
       else if (tab === "quick") renderQuickCalibrateTab();
@@ -3843,133 +3833,6 @@
       bindStatisticsEvents(lib);
     }
 
-    function renderToolsView() {
-      const lib = getCurrentLibrary();
-      document.getElementById("app").innerHTML = `
-        <div class="grid">
-          <section class="card span-12">
-            <h2>工具</h2>
-            <div class="small muted">云端同步、数据备份、手动校准和危险操作，按需展开使用。日常听写一般不需要用到这里。</div>
-          </section>
-
-          <section class="card span-12 collapsible-section is-open" id="cloudSyncPanel">
-            <button class="section-toggle" type="button">
-              <div class="section-toggle-info">
-                <span class="section-toggle-title">云端同步</span>
-                <span class="section-toggle-desc">账号登录与同步状态</span>
-              </div>
-              <span class="section-toggle-arrow">▾</span>
-            </button>
-            <div class="section-body">
-              <button class="info-btn" type="button" data-info-target="cloud-info" title="查看说明">？</button>
-              <div class="info-box" id="cloud-info" hidden>数据变更后会自动上传；切回前台或刷新页面时会自动检查云端并同步。覆盖本机数据仍需手动操作。</div>
-              <div class="stats">
-                <div class="stat"><div class="small muted">当前模式</div><div class="strong" id="cloudModeText">正在检查...</div></div>
-                <div class="stat"><div class="small muted">当前用户</div><div class="strong" id="cloudUserText">正在检查...</div></div>
-              </div>
-              <div class="row mobile-full" id="cloudLoginControls" style="margin-top:12px">
-                <label style="flex:1 1 280px">邮箱
-                  <input id="cloudEmailInput" type="email" autocomplete="email" placeholder="请输入邮箱">
-                </label>
-                <label style="flex:1 1 280px">密码
-                  <input id="cloudPasswordInput" type="password" autocomplete="current-password" placeholder="请输入密码">
-                </label>
-                <button id="cloudLoginBtn" type="button">登录</button>
-                <button class="secondary" id="cloudLogoutBtn" type="button" hidden>退出登录</button>
-              </div>
-              <div class="small muted" id="cloudSyncMessage" style="margin-top:10px" aria-live="polite"></div>
-              <div class="row mobile-full" style="margin-top:12px">
-                <button id="cloudUploadBtn" type="button" disabled>上传本地数据到云端</button>
-                <button class="secondary" id="cloudSummaryBtn" type="button" disabled>查看云端数据摘要</button>
-                <button class="secondary" id="cloudDiagnoseBtn" type="button" disabled>诊断本机与云端数据</button>
-                <button class="danger" id="cloudDownloadBtn" type="button" disabled>从云端下载到本机</button>
-              </div>
-              <div class="small muted" style="margin-top:8px">用于在新设备或空浏览器中恢复云端数据。会覆盖当前设备的本地数据，请先备份。</div>
-              <div class="stats" id="cloudDataSummary" style="margin-top:12px" hidden>
-                <div class="stat"><div class="small muted">云端词库</div><div class="num" id="cloudLibraryCount">0</div></div>
-                <div class="stat"><div class="small muted">云端单词</div><div class="num" id="cloudWordCount">0</div></div>
-                <div class="stat"><div class="small muted">云端听写记录</div><div class="num" id="cloudSessionCount">0</div></div>
-                <div class="stat"><div class="small muted">云端学习/错词进度</div><div class="num" id="cloudProgressCount">0</div></div>
-              </div>
-              <div class="notice small" id="cloudDiagnosticOutput" style="margin-top:12px; white-space:pre-wrap" hidden></div>
-              <div class="small muted" id="cloudActionMessage" style="margin-top:10px; white-space:pre-wrap" aria-live="polite"></div>
-              <button class="secondary" id="cloudReloadBtn" type="button" style="margin-top:10px" hidden>刷新页面并使用恢复的数据</button>
-            </div>
-          </section>
-
-          <section class="card span-12 collapsible-section">
-            <button class="section-toggle" type="button">
-              <div class="section-toggle-info">
-                <span class="section-toggle-title">数据备份</span>
-                <span class="section-toggle-desc">导出与导入词库及全部数据</span>
-              </div>
-              <span class="section-toggle-arrow">▾</span>
-            </button>
-            <div class="section-body">
-              <button class="info-btn" type="button" data-info-target="backup-info" title="查看说明">？</button>
-              <div class="info-box" id="backup-info" hidden>导入会覆盖数据，操作前建议先导出全部数据备份。</div>
-              <div class="row mobile-full">
-                <button id="statsDownloadLibraryBtn">导出当前词库</button>
-                <button class="danger" id="statsImportReplaceLibraryBtn">导入并覆盖当前词库</button>
-                <button class="secondary" id="statsImportNewLibraryBtn">导入为新词库</button>
-                <button id="statsDownloadAllBtn">导出全部数据</button>
-                <button class="danger" id="statsImportAllBtn">导入并覆盖全部数据</button>
-              </div>
-              <input id="statsLibraryImportFile" type="file" accept="application/json,.json" style="display:none">
-              <input id="statsAllImportFile" type="file" accept="application/json,.json" style="display:none">
-            </div>
-          </section>
-
-          <section class="card span-12 collapsible-section">
-            <button class="section-toggle" type="button">
-              <div class="section-toggle-info">
-                <span class="section-toggle-title">手动校准</span>
-                <span class="section-toggle-desc">补录历史记录、维护错词池</span>
-              </div>
-              <span class="section-toggle-arrow">▾</span>
-            </button>
-            <div class="section-body">
-              <button class="info-btn" type="button" data-info-target="manual-info" title="查看说明">？</button>
-              <div class="info-box" id="manual-info" hidden>适用于补录已在线下完成的听写、修正历史记录、维护错词池。日常听写不需要使用。</div>
-              <div class="tabs">
-                <button class="secondary" data-manual-tab="batch">连续按天补录</button>
-                <button class="secondary" data-manual-tab="strict">高级：指定新词补录</button>
-                <button class="secondary" data-manual-tab="quick">快速校准已学进度</button>
-                <button class="secondary" data-manual-tab="pool">手动维护错词池</button>
-                <button class="secondary" data-manual-tab="history">历史记录修改</button>
-              </div>
-              <div id="manualContent" style="margin-top:12px"></div>
-            </div>
-          </section>
-
-          <section class="card span-12 collapsible-section danger-zone-section">
-            <button class="section-toggle" type="button">
-              <div class="section-toggle-info">
-                <span class="section-toggle-title">⚠ 危险操作</span>
-                <span class="section-toggle-desc">不可逆的记录修改，操作前请先备份数据</span>
-              </div>
-              <span class="section-toggle-arrow">▾</span>
-            </button>
-            <div class="section-body">
-              <div class="notice small">这些操作会改变学习记录。操作前建议先导出全部数据备份。</div>
-              <div class="row mobile-full" style="margin-top:12px">
-                <button class="danger" id="undoLatestRecordBtn">撤销最近一次完成记录</button>
-              </div>
-            </div>
-          </section>
-        </div>
-      `;
-      document.querySelectorAll("[data-manual-tab]").forEach(button => {
-        button.onclick = () => renderManualTab(button.dataset.manualTab);
-      });
-      renderManualTab("batch");
-      bindStatisticsBackupEvents(lib);
-      setupToolsSections();
-      if (window.cloudSync && typeof window.cloudSync.mount === "function") {
-        window.cloudSync.mount();
-      }
-    }
-
     function setupToolsSections() {
       document.querySelectorAll(".collapsible-section > .section-toggle").forEach(btn => {
         btn.onclick = () => btn.closest(".collapsible-section").classList.toggle("is-open");
@@ -4279,10 +4142,6 @@
       await downloadWorkbook(workbook, "今日错词-Day" + record.dayNumber + "-" + getRecordDate(record) + ".xlsx");
     }
 
-    function exportWrongWordsCsv(lib, record, emptyMessage = "该记录没有错词可导出。") {
-      exportWrongWordsXlsx(lib, record, emptyMessage);
-    }
-
     function getDictationDataRowHeight(rowsPerColumn) {
       if (rowsPerColumn >= 30) return 28;
       if (rowsPerColumn >= 27) return 31;
@@ -4419,10 +4278,6 @@
         fillDictationPaperWord(sheet, rowIndex, startCol, word, rowsPerColumn);
       });
       await downloadWorkbook(workbook, "听写纸-Day" + task.dayNumber + "-" + exportDate + ".xlsx");
-    }
-
-    function exportTaskToCsv(lib, task) {
-      exportDictationPaperXlsx(lib, task);
     }
 
     function exportWrongWordsToCsv(lib, words, label) {

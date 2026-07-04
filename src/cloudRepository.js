@@ -44,48 +44,6 @@ export async function ensureProfile(profile = {}) {
   return data;
 }
 
-export async function listCloudLibraries() {
-  const client = requireCloudClient();
-  const user = await getCurrentUser();
-  if (!user) return [];
-  const { data, error } = await client
-    .from("libraries")
-    .select("id, owner_id, name, description, visibility, created_at, updated_at")
-    .order("updated_at", { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
-
-export async function uploadLibrarySkeleton(library) {
-  const client = requireCloudClient();
-  const user = await getCurrentUser();
-  if (!user) throw new Error("请先登录云端");
-  if (!library || !String(library.name || "").trim()) throw new Error("词库名称不能为空");
-
-  const payload = {
-    owner_id: user.id,
-    name: String(library.name).trim(),
-    description: library.description || null,
-    visibility: "private"
-  };
-  const { data, error } = await client.from("libraries").insert(payload).select().single();
-  if (error) throw error;
-  return data;
-}
-
-export async function downloadLibrarySkeleton(libraryId) {
-  const client = requireCloudClient();
-  const user = await getCurrentUser();
-  if (!user) throw new Error("请先登录云端");
-  const { data, error } = await client
-    .from("libraries")
-    .select("id, owner_id, name, description, visibility, created_at, updated_at")
-    .eq("id", libraryId)
-    .single();
-  if (error) throw error;
-  return data;
-}
-
 const CLOUD_BATCH_SIZE = 200;
 
 function chunkRows(rows, size = CLOUD_BATCH_SIZE) {
