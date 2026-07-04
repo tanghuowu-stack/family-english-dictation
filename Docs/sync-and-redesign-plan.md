@@ -757,38 +757,75 @@ alter table public.user_word_progress
 
 ## 项目当前整体状态（截至这次更新）
 
-**已解决**：自动双向云端同步（含听写/撤销/补录/错词池调整全部触发点）、多词库死循环(S1)、补录数据丢失(S2)、拉取覆盖本地未上传数据(S4)、pendingCloudUpload自锁、iPad同步失败重试、PWA同步死循环、PWA代码版本检测、S5手动标记同步、S3上传原子性加固、S6单条坏记录不再拖垮整体同步、全站界面美化+移动端响应式适配。
+**已解决**：自动双向云端同步（含听写/撤销/补录/错词池调整全部触发点）、多词库死循环(S1)、补录数据丢失(S2)、拉取覆盖本地未上传数据(S4)、pendingCloudUpload自锁、iPad同步失败重试、PWA同步死循环、PWA代码版本检测、S5手动标记同步、全站界面美化+移动端响应式适配。
 
-**仍未处理（完整清单见上方"窗口10"章节，优先级较低，暂缓）**：R1-R10（时区显示、性能优化、死代码清理等）。
+**仍未处理（完整清单见上方"窗口10"章节，优先级较低，暂缓）**：S3（上传非原子操作的残余竞态窗口）、S6（一条坏云端记录导致同步永久静默失效）、R1-R10（时区显示、性能优化、死代码清理等）。
 
 **建议**：不需要再做全面代码审查——上次审查已经很全面，剩余问题都已记录在案，不是"没发现"而是"选择暂缓"。后续更有效的方式是靠实际使用去暴露新问题，而不是重复静态审查。
 
 ---
 
-## 窗口12：S3（上传原子性加固）+ S6（单条坏记录不再拖垮整体同步）
+## 窗口12-14：S3/S6修复 + R1-R10修复 + 优化建议，审查清单全部清零
 
-### S3：上传非原子操作的竞态窗口
+三批分开处理，风险从高到低排序：先严重bug，再低优先级修复，最后纯优化。
 
-`uploadLocalDataToCloud`本身仍是5步串行写入（不是数据库事务）——评估后放弃"改成Postgres RPC事务"（改动量大、风险高，需要在数据库里重写多表写入+外键解析逻辑），采用轻量的"批次标记+完整性检测"：
+### 第一批：S3 + S6（commit `be8930a`）
 
-- 新增`libraries.upload_batch_id`/`upload_complete`两列。每次上传一个词库时，Step1（写libraries行）就置`upload_complete=false`；等words/sessions/user_word_progress三个核心步骤全部无失败后才置`true`。
-- 由于底层写入是幂等upsert，中途失败后下次成功上传会自动补全数据并把标记转回`true`——具备自愈能力，不需要额外的清理脚本。
-- 下载/诊断时读出这个标记，`upload_complete===false`会`console.warn`并写进诊断报告，提示去发起那次上传的设备重新点一次上传。
-- 明确不处理跨设备/跨标签页同时上传的并发场景（按需求，这个场景概率低且用户几乎不会真的这样操作）。
+**S3 - 上传原子性加固**：评估了"真正的跨表事务"（需要写Postgres RPC函数，处理数组字段/外键解析/幂等性/迁移风险）和"批次标记+自愈检测"两个方向，选择后者——改动小、可回滚、原有upsert本身就是幂等的，天然具备自愈能力。给`libraries`表新增`upload_batch_id`+`upload_complete`两列，上传开始置false，words/sessions/progress三个核心步骤全部无失败才置true。下载时读出这个标记，未完成会警告并写入诊断报告，下次正常上传会自动补全纠正（不需要手动干预）。跨设备并发场景按用户要求不处理（概率低）。
 
-**需要手动执行的migration**（新增两个可空列，不影响现有数据；`upload_complete`默认值`true`是为了不把迁移前的旧数据误判为不完整）：
-```sql
-alter table public.libraries add column if not exists upload_batch_id uuid;
-alter table public.libraries add column if not exists upload_complete boolean default true;
-```
+**S6 - 单条坏记录不再拖垮整体同步**：原来只要一条`dictation_sessions`记录引用了缺失的单词就会被判定整批数据invalid，`autoSyncCloudToLocalIfNewer`静默放弃且catch吞掉异常。修复：跳过时精确记录"跳过了几条、影响了多少单词"，`validateCloudRestoredDataForImport`用这个数字扣除掉预期内差异，不再因为一条坏记录否决整批数据；所有跳过/失败路径补上具体console.warn；检测到跳过记录时会有一个不打断使用的toast提示。
 
-### S6：一条坏云端记录导致自动同步永久静默失效
+**Migration**（已执行）：`libraries`表新增`upload_batch_id`(uuid)、`upload_complete`(boolean default true)。
 
-`downloadCloudDataForLocalStorage`本来就只跳过引用了缺失单词/词库的那一条坏记录，真正的问题在下游：`validateCloudRestoredDataForImport`只要发现"恢复的听写记录数"和"云端记录数"对不上，就会判定整批恢复数据invalid，导致`autoSyncCloudToLocalIfNewer`静默放弃整次同步。
+### 第二批：R1-R10（commit `6fde987`）
 
-**修复**：
-- 跳过时精确记录"跳过了几条、影响了多少单词"（`skippedSessionCount`/`skippedSessionAffectedWordCount`），传给校验函数用来把这部分预期内的差异扣除掉，不再一条坏记录拖垮整批数据。
-- 所有跳过/失败路径都补上了具体的`console.warn`（跳过原因、Day、缺失的单词ID），不再有静默吞掉的catch。
-- 自动同步成功但检测到跳过记录或上传未完整时，弹一个不打断使用的toast提示"部分历史数据可能不完整，建议手动检查"。
+逐条修复，附带一次完整的浏览器实测冒烟测试（导入单词、走完整听写提交流程、检查错词本渲染），全部通过无回归：
 
-**部署**：见下次commit。
+- R1：`todayDate()`从UTC改为本地时区取日期，Day调度逻辑不受影响
+- R2：`skipDelayedReviewSchedule`真正接入`updateWordStatsFromRecord`，词进错词池时传播这个标记，退出时消费它跳过`scheduleWrongReview`
+- R3：`saveData()`的`localStorage.setItem`加try/catch，失败时提示用户而不是静默中断流程
+- R4：`downloadCloudDataForLocalStorage`保留调用方当前的`activeLibraryId`，不再固定切换成云端第一个词库
+- R5：`deleteSessionAndSync`失败后5秒自动重试一次
+- R6：统一成共享函数`window.isSuspiciousAllWordsLearnedState`（阈值Day≤20，对应595/30向上取整），两处调用点统一
+- R7：exceljs锁定版本`@4.4.0`+SHA-384 SRI校验+`crossorigin="anonymous"`
+- R8：约20处`word.id`/`record.recordId`/`lib.libraryId`拼接进HTML属性的地方全部套上`escapeHtml()`
+- R9：在慢速下载完成后、`replaceLocalData`覆盖前新增第二道`_autoUploadInProgress`检查，堵住"下载判定后、覆盖前，用户恰好提交听写"这个残余窗口
+- R10：`skipDelayedReviewSchedule`和`delayedReviewPostponed`现在会通过`user_word_progress`上传/恢复
+
+**Migration**（已执行）：`user_word_progress`表新增`skip_delayed_review_schedule`、`delayed_review_postponed`两个可空列。
+
+### 第三批：优化建议（commit `a01d964`）
+
+**优化1（词库页渲染性能）—— 已实施**：新增`getLockedWordIdSet(lib)`，一次遍历生成已学习词id的Set，`renderWordsTable`渲染前统一预计算这个Set+排序列表+位置Map，传给每行渲染函数，把原来O(n²×记录数)的重复扫描降为一次性计算。预览环境验证排序/上移下移/位置编号均正确。
+
+**优化2（全量上传效率）—— 评估后主动放弃，理由合理**：上传逻辑里的旧数据窗口保护、批次完整性标记、已删除数据的云端清理diff，都是跨words/sessions/progress多表联动的，且已经过S3/S5/S6多轮加固。真正做到按表dirty标记需要给15+处调用点补充可靠标记，还要在跳过words上传时额外读取云端word-id映射供外键使用，改动量和回归风险超出"优化"应有的量级，决定不做。
+
+**优化3（死代码清理）—— 已实施，且顺带修复了一个关联bug**：
+- 删除`renderToolsView`（零调用，约126行）
+- 删除`exportTaskToCsv`、`exportWrongWordsCsv`别名壳
+- 删除`cloudRepository.js`未使用导出：`listCloudLibraries`、`uploadLibrarySkeleton`、`downloadLibrarySkeleton`
+- 删除`DEFAULT_SETTINGS`里零读取字段：`earlyPhaseDays`/`earlyNewWordsPerDay`/`laterNewWordsPerDay`/`dailyMaxWords`
+- `speechLang`简化为字面量（确认全仓库唯一引用点只是读取兜底，从无写入路径）
+- **意外发现并修复了一个真实bug**：`renderManualUpdateView`并非完全死代码——`addManualRecord`和`quickCalibrateProgress`保存后直接调用它，这正是之前"补录/快速校准保存后设置页被整个替换掉"的bug根源。删除前把这两处改为只刷新各自的子tab（`renderStrictManualTab`/`renderQuickCalibrateTab`），预览环境验证保存后设置页保持完整不被顶掉。
+
+**冒烟测试**：导入单词、听写提交、错词本、词库页操作、设置页手动校准全部验证通过，无回归。无需额外migration。
+
+---
+
+## 全面代码审查周期总结（截至这次更新）
+
+**背景**：用Claude Fable 5对整个项目做了一次系统性代码审查，产出S1-S6（严重bug）+ R1-R10（潜在风险）+ 优化建议三个层级的问题清单，按风险从高到低分四批用Claude Sonnet 4.6逐一修复验证：
+
+1. S1、S2、S4 + iPad同步失败重试（含PWA死循环、PWA版本检测）
+2. S5（手动重点/顽固标记同步）
+3. S3、S6（上传原子性加固、单条坏记录不拖垮整体同步）
+4. R1-R10（时区、复查调度生效、错误处理、供应链安全、XSS转义、竞态补强、字段同步）+ 优化建议（渲染性能、死代码清理，顺带修复一个UI bug）
+
+**结果：这轮审查提出的所有问题，无一遗漏，全部处理完毕。**
+
+**方法论沉淀（这轮审查+修复周期的经验，以后再遇到类似情况可以复用）**：
+- 全面代码审查用只读诊断模型（Fable 5）一次性做完，实际代码修改交给有实操经验的模型（Sonnet 4.6）分批处理，两者不要混在一起
+- 按风险等级分批：严重bug（可能数据丢失/功能失效）→ 潜在风险（不影响核心但需要加固）→ 纯优化（性能/代码质量），不要图省事一次性全部塞给一个会话
+- 每一批修复完成后都要求做一次完整冒烟测试（不能只满足于"build无报错"），这一习惯在这轮审查中至少发现了一个额外的真实bug（`renderManualUpdateView`导致设置页被顶掉）
+- 遇到"改动量和风险明显超出预期"的优化项，允许模型评估后主动放弃并说明理由，而不是强行完成任务清单
+- 涉及数据库schema变更的migration，全部约定"手动去Supabase Dashboard执行"，不依赖代码部署自动生效，这个惯例贯穿整个项目历史，一直没有出过问题
