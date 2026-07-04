@@ -761,6 +761,50 @@ async function autoSyncCloudToLocalIfNewer() {
   }
 }
 
+// ── 独立的 PWA 代码版本检查（与上面的云端数据同步逻辑完全独立，不共用任何状态）─────────
+// 背景：iOS "添加到主屏幕" 的独立 PWA 窗口用的是一套和普通 Safari 标签页不同的页面缓存/
+// 快照机制，不完全受 Cache-Control 约束——曾出现过服务器和代码都已经更新，但主屏幕图标
+// 打开的窗口仍在跑旧版 JS 的情况。这里用"版本号轮询 + 不一致就强制刷新"来兜底，而不是
+// 引入 Service Worker。
+//
+// __APP_BUILD_VERSION__ 由 vite.config.js 在构建时注入，是"当前这份正在运行的代码是哪次
+// 构建"的编译期常量，随 JS bundle 一起打包，不会因为重新请求而变化。
+// /version.json 是每次构建都会重新生成的静态文件，代表"服务器当前最新是哪次构建"，请求时
+// 用 no-store + 时间戳参数双重绕开缓存。
+// 只要 PWA 窗口卡在旧代码上，这两个值就会不一致，从而检测出"该刷新了"。
+const CURRENT_APP_BUILD_VERSION =
+  typeof __APP_BUILD_VERSION__ !== "undefined" ? __APP_BUILD_VERSION__ : null;
+let _versionCheckInProgress = false;
+
+async function fetchLatestAppVersion() {
+  const response = await fetch("/version.json?_=" + Date.now(), { cache: "no-store" });
+  if (!response.ok) throw new Error("version.json 请求失败，HTTP " + response.status);
+  const payload = await response.json();
+  return String(payload?.version || "");
+}
+
+async function checkAppVersionAndReloadIfStale() {
+  if (_versionCheckInProgress) return;
+  if (!CURRENT_APP_BUILD_VERSION) return;
+  _versionCheckInProgress = true;
+  try {
+    const latestVersion = await fetchLatestAppVersion();
+    if (latestVersion && latestVersion !== CURRENT_APP_BUILD_VERSION) {
+      console.warn(
+        "[versionCheck] 检测到新版本，当前页面代码已过期，即将自动刷新：",
+        { running: CURRENT_APP_BUILD_VERSION, latest: latestVersion }
+      );
+      showSyncToast("发现新版本，正在更新...");
+      setTimeout(() => window.location.reload(), 800);
+    }
+  } catch (error) {
+    console.warn("[versionCheck] 版本检查失败：", error?.message || error);
+  } finally {
+    _versionCheckInProgress = false;
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── 低频定时自动同步（每3分钟，后台时暂停）──────────────────────────────────────
 let _periodicSyncTimer = null;
 const PERIODIC_SYNC_INTERVAL_MS = 3 * 60 * 1000;
@@ -769,6 +813,7 @@ function startPeriodicSync() {
   if (_periodicSyncTimer !== null) return;
   _periodicSyncTimer = setInterval(() => {
     autoSyncCloudToLocalIfNewer();
+    checkAppVersionAndReloadIfStale();
   }, PERIODIC_SYNC_INTERVAL_MS);
 }
 
@@ -804,7 +849,16 @@ async function mount() {
   await refreshCloudStatus(elements);
 }
 
-window.cloudSync = { mount, autoUploadAfterDictation, requestAutoUploadLocalData, autoSyncCloudToLocalIfNewer, deleteSessionAndSync, startPeriodicSync, stopPeriodicSync };
+window.cloudSync = {
+  mount,
+  autoUploadAfterDictation,
+  requestAutoUploadLocalData,
+  autoSyncCloudToLocalIfNewer,
+  deleteSessionAndSync,
+  startPeriodicSync,
+  stopPeriodicSync,
+  checkAppVersionAndReloadIfStale
+};
 
 if (supabase && !authListenerBound) {
   authListenerBound = true;
