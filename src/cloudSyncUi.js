@@ -537,6 +537,9 @@ const AUTO_SYNC_MIN_INTERVAL_MS = 60 * 1000;
 // Fix iPad：检查因网络/认证未就绪失败时，不消耗冷却时间，改为短延迟后自动重试一次
 let _autoSyncRetryTimer = null;
 const AUTO_SYNC_RETRY_DELAY_MS = 5000;
+// Fix S4 兜底：pendingCloudUpload 卡住超过这个时长，强制清除，避免因未预料到的失败路径
+// （或未来类似 bug）导致这个标记永久卡死后续所有自动同步
+const PENDING_UPLOAD_STUCK_TIMEOUT_MS = 60 * 60 * 1000;
 
 async function checkCloudFreshness() {
   // Fix iPad：优先用本地会话（不发网络请求）判断登录状态，减少这个高频检查对网络状态的依赖
@@ -623,23 +626,47 @@ function showSyncToast(message) {
 
 // Fix S4：自动拉取覆盖本机前，如果本机还有未确认上传成功的变更，先尝试补传一次。
 // 补传成功后本机数据已经等于（或不落后于）云端，避免被随后的下载覆盖丢失；
-// 补传失败（例如离线）则放弃本次拉取，宁可这次不同步，也不覆盖本机未上传的变更。
+// 补传因网络等原因失败则放弃本次拉取，宁可这次不同步，也不覆盖本机未上传的变更。
+//
+// 但补传失败还有另一种情况：blockedOlderData —— uploadLocalDataToCloud 判断"本机数据本来就比
+// 云端旧"而主动拒绝上传。这种失败不是"本机有价值的新数据没传上去"，而是"本机数据确实过时"，
+// 覆盖它是安全、符合预期的。如果把这种失败也当成"跳过下载"处理，会导致一旦 pendingCloudUpload
+// 在本机落后于云端时被设为 true，就永远清不掉、永远补传失败、永远跳过下载 —— 一个自锁死循环
+// （这正是本机 Day 落后云端时实际发生过的问题）。所以这里返回结构化结果，让调用方能区分这两种
+// 失败原因，分别处理。
 async function tryUploadPendingLocalChanges() {
   try {
     const user = await getCurrentUser();
-    if (!user) return false;
+    if (!user) {
+      console.warn("[cloudSync] 待上传变更补传跳过：当前未登录云端");
+      return { uploaded: false, blockedOlderData: false };
+    }
     const localData = getLocalDataSnapshot();
     const validation = validateLocalDataForAutoUpload(localData);
-    if (!validation.valid) return false;
+    if (!validation.valid) {
+      console.warn("[cloudSync] 待上传变更补传跳过：本地数据结构校验未通过：", validation.reasons);
+      return { uploaded: false, blockedOlderData: false };
+    }
     const result = await uploadLocalDataToCloud(localData);
-    if (result.blockedOlderData || result.failed > 0) return false;
+    if (result.blockedOlderData) {
+      console.warn(
+        "[cloudSync] 待上传变更补传被阻止：本机数据确实比云端旧，视为正常情况（不是数据丢失风险）：",
+        result.failureReasons
+      );
+      return { uploaded: false, blockedOlderData: true };
+    }
+    if (result.failed > 0) {
+      console.warn("[cloudSync] 待上传变更补传失败：", result.failureReasons);
+      return { uploaded: false, blockedOlderData: false };
+    }
     if (typeof window.clearPendingCloudUpload === "function") window.clearPendingCloudUpload();
     if (typeof window.updateLocalLibraryUpdatedAt === "function") {
       window.updateLocalLibraryUpdatedAt(new Date().toISOString());
     }
-    return true;
-  } catch {
-    return false;
+    return { uploaded: true, blockedOlderData: false };
+  } catch (error) {
+    console.warn("[cloudSync] 待上传变更补传时发生异常：", error?.message || error);
+    return { uploaded: false, blockedOlderData: false };
   }
 }
 
@@ -666,11 +693,35 @@ async function autoSyncCloudToLocalIfNewer() {
     if (activeLib?.currentDraftTask) return;
 
     // Fix S4：本机存在未确认上传成功的变更时，先尝试补传，避免被本次下载覆盖丢失
-    if (typeof window.isPendingCloudUpload === "function" && window.isPendingCloudUpload()) {
-      const uploaded = await tryUploadPendingLocalChanges();
-      if (!uploaded) return;
-      const stillFresh = await checkCloudFreshness();
-      if (!stillFresh) return;
+    if (currentLocalData?.pendingCloudUpload) {
+      // 兜底：标记卡住超过 1 小时还没清除，视为异常状态（例如未预料到的失败路径），强制清除，
+      // 避免这个标记以后再以别的形式变成永久死锁——只能靠开发者读代码才能发现
+      const since = currentLocalData.pendingCloudUploadSince
+        ? new Date(currentLocalData.pendingCloudUploadSince).getTime()
+        : 0;
+      const stuckMs = since ? Date.now() - since : Infinity;
+      if (stuckMs > PENDING_UPLOAD_STUCK_TIMEOUT_MS) {
+        console.warn(
+          "[cloudSync] pendingCloudUpload 标记已卡住超过 1 小时，视为异常状态，强制清除：",
+          { pendingCloudUploadSince: currentLocalData.pendingCloudUploadSince, stuckMinutes: Math.round(stuckMs / 60000) }
+        );
+        if (typeof window.clearPendingCloudUpload === "function") window.clearPendingCloudUpload();
+      } else {
+        const uploadOutcome = await tryUploadPendingLocalChanges();
+        if (uploadOutcome.uploaded) {
+          const stillFresh = await checkCloudFreshness();
+          if (!stillFresh) return;
+        } else if (uploadOutcome.blockedOlderData) {
+          // 本机数据确认比云端旧：这不是"本地新数据没传上去"，覆盖是安全、符合预期的。
+          // 清掉标记后继续往下走下载覆盖，不能在这里 return，否则会永远卡在这个分支。
+          console.warn("[cloudSync] 本机数据确认落后于云端，清除 pendingCloudUpload 标记并继续执行下载覆盖");
+          if (typeof window.clearPendingCloudUpload === "function") window.clearPendingCloudUpload();
+        } else {
+          // 真正的失败原因（网络错误等），本地可能确实有未同步的新变更，保守起见跳过本次下载
+          console.warn("[cloudSync] 本地待上传变更补传失败（非本机数据过时），本次跳过下载覆盖以保护本地数据");
+          return;
+        }
+      }
     }
 
     const result = await downloadCloudDataForLocalStorage(currentLocalData?.version || "1.0.0");

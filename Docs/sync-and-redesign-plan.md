@@ -652,3 +652,64 @@ CREATE INDEX IF NOT EXISTS idx_user_word_progress_user_updated
 4. 数据备份（默认收起）
 5. 手动校准（默认收起）
 6. 危险操作（默认收起，收起态保留警示色）
+
+---
+
+## 窗口9：PWA同步死循环修复
+
+之前记录的"顶部反复显示已同步/不停刷新"问题，排查结论：
+
+**根因链**：Mac上传分5步串行写入（libraries→settings→words→sessions→progress），最后一步progress才是真正决定错词状态的数据。但恢复时`downloadCloudDataForLocalStorage`把本机`lib.updatedAt`设成了云端`libraries.updated_at`（Step1的时间戳，写入最早），而不是真正完成同步的时刻。因为Step1时间戳恒早于Step4(progress)的时间戳，iPad每次刷新后重新检查，永远判定"云端还是更新的"，形成无限拉取-覆盖-刷新循环。iOS PWA模式下`visibilitychange`触发频率远高于普通浏览器标签页，放大了这个循环的观感严重度。同时发现一个独立安全缺陷：同步覆盖前不检查用户是否正在听写中，会打断进行中的听写导致进度丢失。
+
+**修复**：
+1. `replaceLocalData()`覆盖本机数据后，补一次`updateLocalLibraryUpdatedAt()`，把本机时间戳对齐到真正同步完成的时刻，阻断死循环
+2. `autoSyncCloudToLocalIfNewer`执行覆盖前新增检查：如果当前词库存在`currentDraftTask`（正在听写中），直接跳过这次同步
+
+---
+
+## 窗口10：全面代码审查（Fable 5）+ 优先级修复（Sonnet 4.6）
+
+用Claude Fable 5对整个项目做了一次系统性代码审查，产出结构化报告，完整记录如下。
+
+### 已修复的四个问题
+
+**S1 - 多词库场景死循环**：`checkCloudFreshness`本地统计原本只看`activeLibrary`一个词库，云端查询统计全账号聚合值，账号下有第二个词库就会恒判"云端更新"→死循环。修复：本地统计口径改为同样聚合全部词库。文件：`src/cloudSyncUi.js` `checkCloudFreshness`。
+
+**S2 - 手动校准补录数据不上传**：`addManualRecord`、`saveBatchManualDay`、`quickCalibrateProgress`、统计页修改记录日期，四处完全没有触发自动上传，导致补录数据会被之后的自动拉取静默覆盖丢失。修复：四处都补上`requestAutoUploadLocalData`调用。文件：`index.html`。
+
+**S4 - 自动拉取无"本地未上传变更"检测**：新增`markPendingCloudUpload`/`clearPendingCloudUpload`/`isPendingCloudUpload`机制，任何触发上传的操作立即标记待上传，成功后清除；`autoSyncCloudToLocalIfNewer`覆盖前检查这个标记，有则先补传，补传成功再判断是否还需拉取，失败则跳过。文件：`index.html`、`src/cloudSyncUi.js`。
+
+**iPad同步失败重试**：根因是iOS从PWA恢复瞬间`visibilitychange`触发，网络/auth未就绪，原来的`getCurrentUser()`网络请求大概率失败，且冷却时间戳在失败前就已写入，导致60秒内不再重试。修复：①新增`getCurrentUserFromSession`只读本地session不发网络请求；②冷却时间戳改为检查成功跑完后才写入；③失败后5秒自动重试；④失败路径补充`console.warn`。文件：`src/cloudRepository.js`、`src/cloudSyncUi.js`。
+
+**部署**：commit `cbe5e2800c238493fc3f0182508c6bcd0467fbe9`，纯客户端逻辑改动，无schema变更。
+
+### 尚未处理的问题清单（以后想起来直接查）
+
+**严重bug（暂缓）**：
+- S3：上传非原子，`dictation_sessions`比`user_word_progress`先写入，时间戳信号只堵住1/4竞态窗口；`_autoUploadInProgress`是单页面内存变量，跨设备/跨标签页无效
+- S5：`manualFocus`/`manualStubborn`（手动"重点/顽固"标记）不参与上传同步，`recalculateLibraryState`全量重放会把手动错词池调整全部冲掉
+- S6：一条坏的云端记录会导致校验判定整体invalid，静默return且catch吞掉一切，"自动同步永久静默失效"且无法诊断
+
+**潜在风险（R1-R10，未修）**：
+- R1：`todayDate()`用UTC日期，UTC+8早上8点前听写会记成前一天（`index.html:945`）
+- R2：`skipDelayedReviewSchedule`只写不读，快速校准"安排错词复查"复选框实际无效果（`index.html:2137`）
+- R3：`saveData`的`localStorage.setItem`无try/catch，iOS私密模式/配额满会抛异常中断流程（`index.html:1059`）
+- R4：自动拉取会重置`activeLibraryId`，清空所有词库（不只active）的`currentDraftTask`（`cloudRepository.js:884`）
+- R5：撤销记录后续上传失败无重试，云端停留中间态（`cloudSyncUi.js:256`）
+- R6：硬编码魔法数595出现两处，判断条件不一致（`cloudSyncUi.js:137`、`index.html:1147`）
+- R7：exceljs从CDN加载不锁版本无SRI，供应链风险（`index.html:884`）
+- R8：导入JSON的id未转义，自伤型低危注入风险（`index.html:2282`等）
+- R9：拉取判定后、覆盖前的窗口期用户提交听写，上传与替换可能并发冲突（`cloudSyncUi.js:610`）
+- R10：恢复数据丢字段：`skipDelayedReviewSchedule`、`postponedReviewWordIds`等不上云（`cloudRepository.js:830`）
+
+**优化建议（未做）**：
+1. 词库页渲染O(n²×记录数)复杂度，600+词时卡顿，改进方向：预建"已学id Set"
+2. 全量上传每次小变更都重传整个数据集，可按词库做dirty标记
+3. 死代码清理：`renderToolsView`（工具页遗留130行无调用）、`exportTaskToCsv`/`exportWrongWordsCsv`（无调用别名壳）、`renderManualUpdateView`（有UI bug，保存后会错误替换设置页）、`cloudRepository.js`未使用导出、`DEFAULT_SETTINGS`里无处读取字段、`draft_tasks`表未使用（听写进度不跨设备同步是当前设计缺口）
+4. 高频`getCurrentUser()`可进一步换成本地`getSession()`
+
+**安全/RLS**：整体健全，所有表锚定`auth.uid()`，anon key走env注入且已gitignore。小问题：`profiles`表无delete策略；`visibility`列是死字段（以后做词库分享需重审words表select策略）。
+
+**移动端/PWA**：图标缓存问题根源已确认——iOS对已安装图标不会自动刷新，是平台行为不是配置错误，以后换图标只能删除重装；`manifest.webmanifest`的主题色还是改版前的蓝色，与现在绿色UI不一致；viewport缺`viewport-fit=cover`；手动校准三张表没套手机端卡片布局；无service worker断网白屏。
+
+**核心算法结论（好消息）**：错词复查状态机逻辑自洽，`recalculateLibraryState`全量重放保证一致性，日期判断基于逻辑Day不受时区影响。真正的洞是S5和R2，其余核心算法没有发现问题。

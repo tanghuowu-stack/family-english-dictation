@@ -1171,9 +1171,14 @@
       }
     };
 
-    // Fix S4：标记"本地已保存但还未确认上传成功"的变更，供自动拉取前判断是否会覆盖未同步数据
+    // Fix S4：标记"本地已保存但还未确认上传成功"的变更，供自动拉取前判断是否会覆盖未同步数据。
+    // pendingCloudUploadSince 只在标记从 false→true 的那一刻写入，之后重复调用不会刷新它，
+    // 这样 cloudSyncUi.js 里的超时兜底才能准确判断"这个标记卡住多久了"。
     window.markPendingCloudUpload = function() {
       if (data) {
+        if (!data.pendingCloudUpload || !data.pendingCloudUploadSince) {
+          data.pendingCloudUploadSince = new Date().toISOString();
+        }
         data.pendingCloudUpload = true;
         saveData();
       }
@@ -1182,6 +1187,7 @@
     window.clearPendingCloudUpload = function() {
       if (data) {
         data.pendingCloudUpload = false;
+        data.pendingCloudUploadSince = null;
         saveData();
       }
     };
