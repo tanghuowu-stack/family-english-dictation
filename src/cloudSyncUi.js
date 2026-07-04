@@ -5,6 +5,7 @@ import {
   getCloudDataSummary,
   getCloudFreshnessSignals,
   getCurrentUser,
+  getCurrentUserFromSession,
   uploadLocalDataToCloud
 } from "./cloudRepository.js";
 
@@ -142,6 +143,7 @@ function validateLocalDataForAutoUpload(localData) {
 
 async function autoUploadAfterDictation() {
   _autoUploadInProgress = true;
+  if (typeof window.markPendingCloudUpload === "function") window.markPendingCloudUpload();
   setAutoUploadStatus("本次听写已保存到本机，正在自动上传云端...", false, false);
   try {
     const user = await getCurrentUser();
@@ -172,6 +174,7 @@ async function autoUploadAfterDictation() {
     if (typeof window.updateLocalLibraryUpdatedAt === "function") {
       window.updateLocalLibraryUpdatedAt(new Date().toISOString());
     }
+    if (typeof window.clearPendingCloudUpload === "function") window.clearPendingCloudUpload();
     setAutoUploadStatus("本次听写已保存到本机，并已自动上传到云端。", false, true);
   } catch (error) {
     setAutoUploadStatus(
@@ -226,6 +229,7 @@ async function _doAutoUploadForDataChange(reason) {
     if (typeof window.updateLocalLibraryUpdatedAt === "function") {
       window.updateLocalLibraryUpdatedAt(new Date().toISOString());
     }
+    if (typeof window.clearPendingCloudUpload === "function") window.clearPendingCloudUpload();
     setAutoUploadStatus(prefix + "，并已自动上传到云端。", false, true);
   } catch (error) {
     setAutoUploadStatus(
@@ -238,6 +242,8 @@ async function _doAutoUploadForDataChange(reason) {
 }
 
 function requestAutoUploadLocalData(reason) {
+  // 立即标记"待上传"，即使页面在防抖计时器触发前被关闭，重新打开后这个标记仍会保留
+  if (typeof window.markPendingCloudUpload === "function") window.markPendingCloudUpload();
   if (_autoUploadTimer !== null) {
     clearTimeout(_autoUploadTimer);
     _autoUploadTimer = null;
@@ -528,51 +534,59 @@ let _autoUploadInProgress = false;
 // iOS PWA 下 visibilitychange 极其频繁，60 秒内不重复发起 freshness 检查
 let _lastAutoSyncCheckTime = 0;
 const AUTO_SYNC_MIN_INTERVAL_MS = 60 * 1000;
+// Fix iPad：检查因网络/认证未就绪失败时，不消耗冷却时间，改为短延迟后自动重试一次
+let _autoSyncRetryTimer = null;
+const AUTO_SYNC_RETRY_DELAY_MS = 5000;
 
 async function checkCloudFreshness() {
-  try {
-    const user = await getCurrentUser();
-    if (!user) return false;
+  // Fix iPad：优先用本地会话（不发网络请求）判断登录状态，减少这个高频检查对网络状态的依赖
+  const user = await getCurrentUserFromSession();
+  if (!user) return false;
 
-    const localData = getLocalDataSnapshot();
-    if (!localData || !Array.isArray(localData.libraries)) return false;
+  const localData = getLocalDataSnapshot();
+  if (!localData || !Array.isArray(localData.libraries)) return false;
 
-    const libraries = localData.libraries;
-    const activeLibrary = libraries.find(lib => lib.libraryId === localData.activeLibraryId) || libraries[0];
-    if (!activeLibrary) return false;
+  const libraries = localData.libraries;
+  if (!libraries.length) return false;
 
-    const localRecords = Array.isArray(activeLibrary.dailyRecords) ? activeLibrary.dailyRecords : [];
-    const localSessionCount = localRecords.length;
-    const localMaxDay = localRecords.length
-      ? Math.max(...localRecords.map(r => Number(r.dayNumber || 0)))
-      : 0;
-    const localLearnedCount = (activeLibrary.words || []).filter(word => {
+  // Fix S1：getCloudFreshnessSignals 是按 user_id 聚合"该用户全部词库"的计数，
+  // 本地对比基准如果只统计 activeLibrary 一个词库，多词库账号下云端计数必然更大，
+  // 会被恒判为"云端更新"，触发下载+reload 死循环。这里改为本地也聚合全部词库，
+  // 与云端口径保持一致。
+  const localSessionCount = libraries.reduce((sum, lib) => {
+    return sum + (Array.isArray(lib.dailyRecords) ? lib.dailyRecords.length : 0);
+  }, 0);
+  const localMaxDay = libraries.reduce((max, lib) => {
+    const records = Array.isArray(lib.dailyRecords) ? lib.dailyRecords : [];
+    const libMax = records.length ? Math.max(...records.map(r => Number(r.dayNumber || 0))) : 0;
+    return Math.max(max, libMax);
+  }, 0);
+  const localLearnedCount = libraries.reduce((sum, lib) => {
+    return sum + (lib.words || []).filter(word => {
       const day = Number(word.firstLearnDay);
       return word.firstLearnDay != null && Number.isFinite(day) && day > 0;
     }).length;
+  }, 0);
 
-    const signals = await getCloudFreshnessSignals();
-    if (!signals) return false;
+  const signals = await getCloudFreshnessSignals();
+  if (!signals) return false;
 
-    if (signals.sessionCount > localSessionCount) return true;
-    if (signals.maxDayNumber > localMaxDay) return true;
-    if (signals.learnedCount > localLearnedCount) return true;
+  if (signals.sessionCount > localSessionCount) return true;
+  if (signals.maxDayNumber > localMaxDay) return true;
+  if (signals.learnedCount > localLearnedCount) return true;
 
-    // 第四个信号：用 user_word_progress.updated_at 捕获"删除/撤销"等让数量减少的操作。
-    // 该字段在 uploadLocalDataToCloud 最后一步（Step5）才写入，不会在上传中途触发误判。
-    // 本机对比基准用 lib.updatedAt，它在 updateLocalLibraryUpdatedAt() 里与 Step5 同步更新。
-    if (signals.maxProgressUpdatedAt) {
-      const localMaxUpdatedAt = libraries.reduce((max, lib) => {
-        const ts = lib.updatedAt || "";
-        return ts > max ? ts : max;
-      }, "");
-      if (localMaxUpdatedAt && signals.maxProgressUpdatedAt > localMaxUpdatedAt) return true;
-    }
-
-    return false;
-  } catch {
-    return false;
+  // 第四个信号：用 user_word_progress.updated_at 捕获"删除/撤销"等让数量减少的操作。
+  // 该字段在 uploadLocalDataToCloud 最后一步（Step5）才写入，不会在上传中途触发误判。
+  // 本机对比基准用 lib.updatedAt，它在 updateLocalLibraryUpdatedAt() 里与 Step5 同步更新。
+  if (signals.maxProgressUpdatedAt) {
+    const localMaxUpdatedAt = libraries.reduce((max, lib) => {
+      const ts = lib.updatedAt || "";
+      return ts > max ? ts : max;
+    }, "");
+    if (localMaxUpdatedAt && signals.maxProgressUpdatedAt > localMaxUpdatedAt) return true;
   }
+
+  return false;
 }
 
 function showSyncToast(message) {
@@ -607,16 +621,41 @@ function showSyncToast(message) {
   }, 1800);
 }
 
+// Fix S4：自动拉取覆盖本机前，如果本机还有未确认上传成功的变更，先尝试补传一次。
+// 补传成功后本机数据已经等于（或不落后于）云端，避免被随后的下载覆盖丢失；
+// 补传失败（例如离线）则放弃本次拉取，宁可这次不同步，也不覆盖本机未上传的变更。
+async function tryUploadPendingLocalChanges() {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return false;
+    const localData = getLocalDataSnapshot();
+    const validation = validateLocalDataForAutoUpload(localData);
+    if (!validation.valid) return false;
+    const result = await uploadLocalDataToCloud(localData);
+    if (result.blockedOlderData || result.failed > 0) return false;
+    if (typeof window.clearPendingCloudUpload === "function") window.clearPendingCloudUpload();
+    if (typeof window.updateLocalLibraryUpdatedAt === "function") {
+      window.updateLocalLibraryUpdatedAt(new Date().toISOString());
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function autoSyncCloudToLocalIfNewer() {
   if (_autoSyncInProgress) return;
   if (_autoUploadInProgress) return;
   // Fix2: iOS PWA visibilitychange 高频触发保护，60 秒内不重复发起网络检查
   const now = Date.now();
   if (now - _lastAutoSyncCheckTime < AUTO_SYNC_MIN_INTERVAL_MS) return;
-  _lastAutoSyncCheckTime = now;
   _autoSyncInProgress = true;
+  // Fix iPad：只有确认本次检查真正跑完（没有因网络/认证异常报错）才消耗冷却时间，
+  // 否则 iOS 从后台恢复瞬间的一次失败检查会白白占用 60 秒冷却窗口，只能等 3 分钟定时器
+  let checkSucceeded = false;
   try {
     const isFresh = await checkCloudFreshness();
+    checkSucceeded = true;
     if (!isFresh) return;
 
     const currentLocalData = getLocalDataSnapshot();
@@ -626,9 +665,20 @@ async function autoSyncCloudToLocalIfNewer() {
     ) || (currentLocalData?.libraries || [])[0];
     if (activeLib?.currentDraftTask) return;
 
+    // Fix S4：本机存在未确认上传成功的变更时，先尝试补传，避免被本次下载覆盖丢失
+    if (typeof window.isPendingCloudUpload === "function" && window.isPendingCloudUpload()) {
+      const uploaded = await tryUploadPendingLocalChanges();
+      if (!uploaded) return;
+      const stillFresh = await checkCloudFreshness();
+      if (!stillFresh) return;
+    }
+
     const result = await downloadCloudDataForLocalStorage(currentLocalData?.version || "1.0.0");
     const validation = validateRestoredData(result.restoredData, result.cloudCounts || {});
-    if (!validation.valid) return;
+    if (!validation.valid) {
+      console.warn("[cloudSync] 自动同步下载的数据未通过校验，已跳过本次覆盖：", validation.reasons);
+      return;
+    }
 
     replaceLocalData(result.restoredData);
     // Fix1: 更新本机 lib.updatedAt 到当前时刻，使其 ≥ 云端 user_word_progress.updated_at，
@@ -638,10 +688,25 @@ async function autoSyncCloudToLocalIfNewer() {
     }
     showSyncToast("已同步最新数据");
     setTimeout(() => window.location.reload(), 500);
-  } catch {
-    // 静默失败，不打扰用户
+  } catch (error) {
+    // Fix iPad：不再完全静默，留一条 console.warn 方便以后排查"为什么没自动同步"
+    console.warn("[cloudSync] 自动同步检查失败，稍后会自动重试：", error?.message || error);
   } finally {
     _autoSyncInProgress = false;
+    if (checkSucceeded) {
+      _lastAutoSyncCheckTime = Date.now();
+      if (_autoSyncRetryTimer !== null) {
+        clearTimeout(_autoSyncRetryTimer);
+        _autoSyncRetryTimer = null;
+      }
+    } else if (_autoSyncRetryTimer === null) {
+      // Fix iPad：检查失败（多半是网络栈/token 还没就绪），5 秒后自动重试一次，
+      // 不必等到下一次 visibilitychange 或 3 分钟定时器
+      _autoSyncRetryTimer = setTimeout(() => {
+        _autoSyncRetryTimer = null;
+        autoSyncCloudToLocalIfNewer();
+      }, AUTO_SYNC_RETRY_DELAY_MS);
+    }
   }
 }
 

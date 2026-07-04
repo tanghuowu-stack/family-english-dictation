@@ -1171,6 +1171,25 @@
       }
     };
 
+    // Fix S4：标记"本地已保存但还未确认上传成功"的变更，供自动拉取前判断是否会覆盖未同步数据
+    window.markPendingCloudUpload = function() {
+      if (data) {
+        data.pendingCloudUpload = true;
+        saveData();
+      }
+    };
+
+    window.clearPendingCloudUpload = function() {
+      if (data) {
+        data.pendingCloudUpload = false;
+        saveData();
+      }
+    };
+
+    window.isPendingCloudUpload = function() {
+      return Boolean(data && data.pendingCloudUpload);
+    };
+
     function migrateLibrary(lib) {
       lib.libraryId = lib.libraryId || uid("lib");
       lib.libraryName = lib.libraryName || "未命名词库";
@@ -1992,6 +2011,9 @@
       lib.dailyRecords.push(record);
       recalculateLibraryState(lib);
       manualStrictTask = null;
+      if (window.cloudSync && typeof window.cloudSync.requestAutoUploadLocalData === "function") {
+        window.cloudSync.requestAutoUploadLocalData("manual-record-added");
+      }
       alert("已保存补录记录，并完成重新计算。");
       renderManualUpdateView();
     }
@@ -2083,6 +2105,9 @@
       const record = createDailyRecord(lib, task, wrongIds, "manual-batch");
       lib.dailyRecords.push(record);
       recalculateLibraryState(lib);
+      if (window.cloudSync && typeof window.cloudSync.requestAutoUploadLocalData === "function") {
+        window.cloudSync.requestAutoUploadLocalData("manual-batch-day-saved");
+      }
 
       manualBatchSession.currentOffset += 1;
       if (manualBatchSession.currentOffset >= manualBatchSession.totalDays) {
@@ -2144,6 +2169,9 @@
       }
       lib.dailyRecords.push(...newRecords);
       recalculateLibraryState(lib);
+      if (window.cloudSync && typeof window.cloudSync.requestAutoUploadLocalData === "function") {
+        window.cloudSync.requestAutoUploadLocalData("quick-calibrate");
+      }
       alert("快速校准完成。");
       renderManualUpdateView();
     }
@@ -3961,6 +3989,9 @@
           record.date = input.value || todayDate();
           lib.updatedAt = new Date().toISOString();
           saveData();
+          if (window.cloudSync && typeof window.cloudSync.requestAutoUploadLocalData === "function") {
+            window.cloudSync.requestAutoUploadLocalData("record-date-changed");
+          }
         };
       });
       document.querySelectorAll("[data-export-record-wrong]").forEach(button => {

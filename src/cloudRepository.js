@@ -15,6 +15,16 @@ export async function getCurrentUser() {
   return data.user || null;
 }
 
+// 只读本地会话（getSession 不发起网络请求验证 token），用于高频的 freshness 轮询场景。
+// iOS PWA 从后台恢复的瞬间调用 auth.getUser() 的网络请求经常还没就绪就失败，
+// 这里用更轻量的本地会话判断代替，减少这类检查对网络状态的依赖。
+export async function getCurrentUserFromSession() {
+  if (!supabase) return null;
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  return sessionData.session?.user || null;
+}
+
 export async function ensureProfile(profile = {}) {
   const client = requireCloudClient();
   const user = await getCurrentUser();
@@ -921,7 +931,7 @@ export async function deleteCloudSessionBySourceLocalId(libraryLocalId, sessionS
 
 export async function getCloudFreshnessSignals() {
   const client = requireCloudClient();
-  const user = await getCurrentUser();
+  const user = await getCurrentUserFromSession();
   if (!user) return null;
 
   const { count: sessionCount, error: sessionCountError } = await client
