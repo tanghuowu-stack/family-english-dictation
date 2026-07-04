@@ -111,6 +111,10 @@ function positiveDayOrNull(value) {
   return number != null && number > 0 ? number : null;
 }
 
+function booleanOrNull(value) {
+  return value === null || value === undefined ? null : Boolean(value);
+}
+
 function validTimestamp(value, fallback = null) {
   if (!value) return fallback;
   const timestamp = new Date(value);
@@ -385,6 +389,8 @@ export async function uploadLocalDataToCloud(localData) {
         wrong_review_due_day: positiveDayOrNull(word.wrongReviewDueDay ?? word.delayedReviewDay),
         wrong_review_stage: numberOrNull(word.wrongReviewStage) ?? 0,
         last_exited_wrong_pool_day: positiveDayOrNull(word.lastExitedWrongPoolDay),
+        manual_focus: booleanOrNull(word.manualFocus),
+        manual_stubborn: booleanOrNull(word.manualStubborn),
         updated_at: new Date().toISOString()
       }];
     });
@@ -649,8 +655,10 @@ function restoreProgressOnWord(word, progress) {
   word.wrongReviewCompletedCount = Math.max(0, word.wrongReviewStage - 1);
   word.lastExitedWrongPoolDay = positiveDayOrNull(progress.last_exited_wrong_pool_day);
   word.delayedReviewCompleted = word.wrongReviewDueDay == null && !word.isPendingWrong && word.wrongCount > 0;
-  word.isFocus = word.wrongCount >= 2;
-  word.isStubborn = word.wrongCount >= 3;
+  word.manualFocus = booleanOrNull(progress.manual_focus);
+  word.manualStubborn = booleanOrNull(progress.manual_stubborn);
+  word.isFocus = word.manualFocus == null ? word.wrongCount >= 2 : word.manualFocus;
+  word.isStubborn = word.manualStubborn == null ? word.wrongCount >= 3 : word.manualStubborn;
 }
 
 export async function downloadCloudDataForLocalStorage(appVersion = "1.0.0") {
@@ -703,7 +711,7 @@ export async function downloadCloudDataForLocalStorage(appVersion = "1.0.0") {
   const cloudProgress = await fetchAllCloudRows(
     client,
     "user_word_progress",
-    "id,user_id,library_id,word_id,first_learn_day,wrong_count,is_pending_wrong,correct_streak,wrong_review_due_day,wrong_review_stage,last_exited_wrong_pool_day,created_at,updated_at",
+    "id,user_id,library_id,word_id,first_learn_day,wrong_count,is_pending_wrong,correct_streak,wrong_review_due_day,wrong_review_stage,last_exited_wrong_pool_day,manual_focus,manual_stubborn,created_at,updated_at",
     query => query.eq("user_id", user.id)
   );
   result.cloudCounts = {

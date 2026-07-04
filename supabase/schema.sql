@@ -74,6 +74,8 @@ create table if not exists public.user_word_progress (
   wrong_review_due_day integer,
   wrong_review_stage integer default 0,
   last_exited_wrong_pool_day integer,
+  manual_focus boolean,
+  manual_stubborn boolean,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   unique (user_id, library_id, word_id)
