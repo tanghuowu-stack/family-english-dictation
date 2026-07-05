@@ -4542,6 +4542,9 @@
       // 独立的 PWA 代码版本检查，和上面的云端数据同步互不相关，见 cloudSyncUi.js 说明
       window.cloudSync?.checkAppVersionAndReloadIfStale?.();
     });
+    window.addEventListener("pageshow", () => {
+      window.cloudSync?.checkAppVersionAndReloadIfStale?.();
+    });
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") {
         if (window.cloudSync?.autoSyncCloudToLocalIfNewer) {

@@ -824,6 +824,12 @@ async function fetchLatestAppVersion() {
   return String(payload?.version || "");
 }
 
+function forceReloadWithCacheBust() {
+  const url = new URL(window.location.href);
+  url.searchParams.set("_app_refresh", String(Date.now()));
+  window.location.replace(url.toString());
+}
+
 async function checkAppVersionAndReloadIfStale() {
   if (_versionCheckInProgress) return;
   if (!CURRENT_APP_BUILD_VERSION) return;
@@ -836,7 +842,7 @@ async function checkAppVersionAndReloadIfStale() {
         { running: CURRENT_APP_BUILD_VERSION, latest: latestVersion }
       );
       showSyncToast("发现新版本，正在更新...");
-      setTimeout(() => window.location.reload(), 800);
+      setTimeout(() => forceReloadWithCacheBust(), 800);
     }
   } catch (error) {
     console.warn("[versionCheck] 版本检查失败：", error?.message || error);
