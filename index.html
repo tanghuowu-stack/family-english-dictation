@@ -926,6 +926,7 @@
       showAnswerMeaning: false,
       correctTimesToExitWrongPool: 1
     };
+    const DAILY_MAX_WORDS = 60;
 
     // Fix R6：这个异常检测（低 Day 下某个固定词数全部已学完，大概率是同步/校验出错而不是真的学完）
     // 原来在本文件和 cloudSyncUi.js 里各写了一份，阈值不一致（13 vs 20）。统一到这里一份，
@@ -1781,7 +1782,11 @@
         alert("请先在词库中导入单词。");
         return;
       }
+      const selectedDate = document.getElementById("taskDateInput")?.value || todayDate();
       const task = buildTodayTask(lib);
+      task.date = selectedDate;
+      lib.currentDraftTask = task;
+      saveData();
       dictationIndex = Math.min(Number(task.currentIndex || 0), Math.max(0, task.taskWordIds.length - 1));
       todaySummary = null;
       renderTodayView("player");
@@ -2812,6 +2817,13 @@
             <div>错词池：<span class="strong">${previewCounts.wrong}</span> 个。</div>
             <div>到期复习单词：<span class="strong">${previewCounts.review}</span> 个。</div>
             <div>合计：<span class="strong">${previewCounts.total}</span> 个。</div>
+            <div class="row" style="margin-top:4px">
+              <label style="max-width:220px">本次记录日期
+                <input id="taskDateInput" type="date" value="${todayDate()}">
+              </label>
+              <span class="small muted">请选择实际听写日期，不需要和上一次连续。</span>
+            </div>
+            <div class="notice small">提醒：一天不超过 <span class="strong">${DAILY_MAX_WORDS}</span> 个词。</div>
             ${previewCounts.postponedReview > 0 ? '<div class="small muted">另有 ' + previewCounts.postponedReview + ' 个到期复习单词超过当天到期复查数，已顺延到后续。</div>' : ''}
             ${lib.settings.pauseNewWords ? '<div class="notice">当前已暂停新词，今日只安排错词和到期错词复查。</div>' : ''}
             <button id="startDictationBtn">生成/开始今日听写</button>
@@ -4286,8 +4298,8 @@
       workbook.creator = "家庭英语单词听写";
       workbook.created = new Date();
       const ids = uniqueWordIds(task.taskWordIds);
-      if (ids.length > 60) {
-        alert("听写纸最多支持一页 60 个词，请先减少今日听写数量后再导出。");
+      if (ids.length > DAILY_MAX_WORDS) {
+        alert("听写纸最多支持一页 " + DAILY_MAX_WORDS + " 个词，请先减少今日听写数量后再导出。");
         return;
       }
       const rowsPerColumn = Math.ceil(ids.length / 2);
