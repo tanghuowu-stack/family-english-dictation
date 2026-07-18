@@ -1632,6 +1632,30 @@
       return lib.currentDraftTask;
     }
 
+    function getTodayTaskPreviewCounts(lib = getCurrentLibrary()) {
+      const dayNumber = getNextDayNumber(lib);
+      const plannedNewCount = getPlannedNewWordCount(dayNumber, lib);
+      const pendingWrongWords = getPendingWrongWords(lib);
+      const dueReviewWords = getDueDelayedReviewWords(dayNumber, lib);
+      const unlearnedWords = getUnlearnedWords(lib);
+      const limited = applyDailyLimit(pendingWrongWords, dueReviewWords, unlearnedWords, plannedNewCount, lib.settings);
+      const taskSet = new Set(uniqueWordIds([
+        ...limited.pendingWrongWordIds,
+        ...limited.delayedReviewWordIds,
+        ...limited.newWordIds
+      ]));
+      const wrongSet = new Set(uniqueWordIds(limited.pendingWrongWordIds).filter(id => taskSet.has(id)));
+      const reviewSet = new Set(uniqueWordIds(limited.delayedReviewWordIds).filter(id => taskSet.has(id) && !wrongSet.has(id)));
+      const newSet = new Set(uniqueWordIds(limited.newWordIds).filter(id => taskSet.has(id) && !wrongSet.has(id) && !reviewSet.has(id)));
+      return {
+        new: newSet.size,
+        wrong: wrongSet.size,
+        review: reviewSet.size,
+        total: taskSet.size,
+        postponedReview: uniqueWordIds(limited.postponedReviewWordIds).length
+      };
+    }
+
     function orderTaskIds(ids, lib) {
       const unique = Array.from(new Set(ids));
       if (lib.settings.playOrder === "random") {
@@ -2779,16 +2803,16 @@
         return '<section class="card span-12"><div class="empty">当前词库还没有单词。请先到词库导入。</div></section>';
       }
       const dayNumber = getNextDayNumber(lib);
-      const planned = getPlannedNewWordCount(dayNumber, lib);
-      const reviewCount = clampNumber(lib.settings.dailyReviewWords, 0, 100, 30);
-      const dueCount = getDueDelayedReviewWords(dayNumber, lib).length;
+      const previewCounts = getTodayTaskPreviewCounts(lib);
       return `
         <section class="card span-12">
           <div class="stack">
             <div class="notice small">点击开始后会生成今日任务。任务生成后会保留在浏览器中，只有提交错词结果才算完成这一天。</div>
-            <div>当天新词数：<span class="strong">${planned}</span> 个。</div>
-            <div>当前错词池会全部进入今日任务。</div>
-            ${dueCount > 0 ? '<div>当前有 <span class="strong">' + dueCount + '</span> 个到期错词复查，本次最多取 <span class="strong">' + reviewCount + '</span> 个。</div>' : ''}
+            <div>新单词：<span class="strong">${previewCounts.new}</span> 个。</div>
+            <div>错词池：<span class="strong">${previewCounts.wrong}</span> 个。</div>
+            <div>到期复习单词：<span class="strong">${previewCounts.review}</span> 个。</div>
+            <div>合计：<span class="strong">${previewCounts.total}</span> 个。</div>
+            ${previewCounts.postponedReview > 0 ? '<div class="small muted">另有 ' + previewCounts.postponedReview + ' 个到期复习单词超过当天到期复查数，已顺延到后续。</div>' : ''}
             ${lib.settings.pauseNewWords ? '<div class="notice">当前已暂停新词，今日只安排错词和到期错词复查。</div>' : ''}
             <button id="startDictationBtn">生成/开始今日听写</button>
           </div>
