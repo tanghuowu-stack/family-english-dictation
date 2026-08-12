@@ -20,26 +20,24 @@
     :root {
       --content-width: 1080px;
 
-      /* §2 色板（全绿色系，深浅区分风险等级） */
-      --color-primary: #3AAFA9;
-      --color-primary-dark: #2B7A78;
-      --color-primary-light: #DEF2F1;
-      /* 今日横幅用深青绿（原橙色accent位置） */
-      --color-accent: #2B7A78;
-      --color-accent-dark: #1D5A58;
-      --color-accent-light: #DEF2F1;
-      /* 危险/高风险操作：深墨绿（比主色更深更饱和） */
-      --color-danger: #1B5E3A;
-      --color-danger-light: #D0EAD8;
-      --color-success: #4CAF8E;
-      --color-success-light: #E3F4ED;
-      --color-bg: #FAFAF8;
-      --color-card-bg: #FFFFFF;
-      --color-text-primary: #2D3142;
-      --color-text-secondary: #6B7280;
-      --color-border: #E5E7EB;
-      --color-highlight: #F2C14E;
-      --color-highlight-light: #FDF3D9;
+      /* §2 色板（低饱和暖米色 + 浅紫色） */
+      --color-primary: #6f5bd3;
+      --color-primary-dark: #5743bd;
+      --color-primary-light: #eee9ff;
+      --color-accent: #6f5bd3;
+      --color-accent-dark: #5743bd;
+      --color-accent-light: #eee9ff;
+      --color-danger: #d96c63;
+      --color-danger-light: #fff0ed;
+      --color-success: #3f987b;
+      --color-success-light: #eaf8f2;
+      --color-bg: #f7f2ea;
+      --color-card-bg: #fffdf9;
+      --color-text-primary: #28243d;
+      --color-text-secondary: #777181;
+      --color-border: #e7ded3;
+      --color-highlight: #6f5bd3;
+      --color-highlight-light: #eee9ff;
 
       /* §4 圆角 & 阴影 */
       --radius-card: 16px;
@@ -50,17 +48,17 @@
       --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.1);
 
       /* 旧变量名保留（JS 渲染模板中有 inline 引用），值映射到新色板 */
-      --bg: #FAFAF8;
-      --panel: #FFFFFF;
-      --text: #2D3142;
-      --muted: #6B7280;
-      --line: #E5E7EB;
-      --brand: #3AAFA9;
-      --brand-dark: #2B7A78;
-      --ok: #4CAF8E;
-      --warn: #C4860A;
-      --danger: #1B5E3A;
-      --soft: #DEF2F1;
+      --bg: #f7f2ea;
+      --panel: #fffdf9;
+      --text: #28243d;
+      --muted: #777181;
+      --line: #e7ded3;
+      --brand: #6f5bd3;
+      --brand-dark: #5743bd;
+      --ok: #3f987b;
+      --warn: #9a7131;
+      --danger: #d96c63;
+      --soft: #eee9ff;
       --radius: 10px;
       --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     }
@@ -71,9 +69,10 @@
       margin: 0;
       background: var(--color-bg);
       color: var(--color-text-primary);
-      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
-                   -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                   "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.55;
       letter-spacing: 0;
     }
 
@@ -235,7 +234,7 @@
       border-color: var(--color-danger);
     }
 
-    button.danger:hover { background: #134a2c; border-color: #134a2c; }
+    button.danger:hover { background: #bd5a52; border-color: #bd5a52; }
 
     /* 幽灵按钮：中性描边 */
     button.ghost {
@@ -244,7 +243,7 @@
       border-color: var(--color-border);
     }
 
-    button.ghost:hover { background: #f2f4f7; }
+    button.ghost:hover { background: #f3eee8; }
 
     button:disabled { opacity: .55; cursor: not-allowed; }
 
@@ -261,13 +260,13 @@
     input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(58, 175, 169, 0.15);
+      box-shadow: 0 0 0 3px rgba(111, 91, 211, 0.15);
     }
 
     textarea {
       min-height: 150px;
       resize: vertical;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-family: inherit;
       font-size: 14px;
     }
 
@@ -307,22 +306,22 @@
 
     .stat .num {
       font-size: 22px;
-      font-weight: 800;
+      font-weight: 700;
       color: var(--color-primary-dark);
     }
 
     .notice {
-      border: 1px solid rgba(242, 193, 78, 0.5);
+      border: 1px solid rgba(111, 91, 211, 0.24);
       background: var(--color-highlight-light);
-      color: #7A5100;
+      color: var(--color-primary-dark);
       border-radius: var(--radius-input);
       padding: 10px 12px;
     }
 
     .success {
-      border: 1px solid rgba(76, 175, 142, 0.35);
+      border: 1px solid rgba(63, 152, 123, 0.28);
       background: var(--color-success-light);
-      color: #0d5d45;
+      color: #2f745f;
       border-radius: var(--radius-input);
       padding: 10px 12px;
     }
@@ -335,9 +334,9 @@
       padding: 3px 10px;
       border-radius: var(--radius-badge);
       border: none;
-      /* 历史错词：灰绿中性 */
-      background: #E2EDE8;
-      color: #4A6B5A;
+      /* 历史错词：暖灰中性 */
+      background: #f3eee8;
+      color: var(--color-text-secondary);
       font-size: 12px;
       font-weight: 500;
       white-space: nowrap;
@@ -376,7 +375,7 @@
 
     .today-banner .stat .num {
       font-size: 26px;
-      font-weight: 800;
+      font-weight: 700;
       color: var(--color-primary-dark);
     }
 
@@ -391,11 +390,15 @@
     }
     .secondary-bar .stat .num { font-size: 17px; font-weight: 700; color: var(--color-text-secondary); }
 
-    /* §5.7 危险操作区块：浅绿背景 + 深绿顶边 + 额外间距 */
+    /* §5.7 危险操作区块：统一使用全站紫色系 */
     .danger-zone-section {
-      background: var(--color-danger-light);
-      border-color: rgba(27, 94, 58, 0.2);
-      border-top: 3px solid var(--color-danger);
+      --danger: var(--color-primary);
+      --danger-soft: var(--color-primary-light);
+      --danger-border: rgba(111, 91, 211, 0.28);
+      background: var(--danger-soft);
+      border-color: var(--danger-border);
+      border-top: 3px solid var(--danger);
+      color: var(--color-text-secondary);
       margin-top: 20px;
     }
 
@@ -468,7 +471,28 @@
     }
 
     .danger-zone-section .section-toggle-title {
-      color: var(--color-danger);
+      color: var(--danger);
+    }
+
+    .danger-zone-section .section-body,
+    .danger-zone-section .notice {
+      border-color: var(--danger-border);
+      color: var(--color-text-secondary);
+    }
+
+    .danger-zone-section .notice {
+      background: var(--danger-soft);
+    }
+
+    .danger-zone-section button.danger {
+      background: var(--danger);
+      border-color: var(--danger);
+    }
+
+    .danger-zone-section button.danger:hover {
+      background: var(--danger-soft);
+      border-color: var(--danger-border);
+      color: var(--danger);
     }
 
     .info-btn {
@@ -578,7 +602,7 @@
 
     .progress-big {
       font-size: 36px;
-      font-weight: 800;
+      font-weight: 700;
       color: var(--color-primary-dark);
     }
 
@@ -661,7 +685,7 @@
     }
     .today-primary-stats .stat .num {
       font-size: 20px;
-      font-weight: 800;
+      font-weight: 700;
       color: var(--color-primary-dark);
     }
     .today-divider {
@@ -887,13 +911,434 @@
       td button { min-height: 36px; }
       .tag { white-space: nowrap; }
     }
+
+    /* 2026 UI refresh: bright, compact family workspace */
+    :root {
+      --content-width: 1240px;
+      --color-primary: #079da2;
+      --color-primary-dark: #067d82;
+      --color-primary-light: #e1f6f5;
+      --color-accent: #ffc928;
+      --color-accent-dark: #8b6500;
+      --color-accent-light: #fff7d7;
+      --color-danger: #d8665d;
+      --color-danger-light: #fff1ef;
+      --color-success: #15977c;
+      --color-success-light: #e2f7f0;
+      --color-bg: #f4faf9;
+      --color-card-bg: #ffffff;
+      --color-text-primary: #20292b;
+      --color-text-secondary: #687779;
+      --color-border: #dce9e8;
+      --color-highlight: #ffc928;
+      --color-highlight-light: #fff7d7;
+      --radius-card: 8px;
+      --radius-button: 7px;
+      --radius-input: 7px;
+      --shadow-card: 0 2px 8px rgba(6, 90, 94, 0.06);
+      --shadow-card-hover: 0 5px 16px rgba(6, 90, 94, 0.1);
+
+      --bg: #f4faf9;
+      --panel: #ffffff;
+      --text: #20292b;
+      --muted: #687779;
+      --line: #dce9e8;
+      --brand: #079da2;
+      --brand-dark: #067d82;
+      --ok: #15977c;
+      --warn: #8b6500;
+      --danger: #d8665d;
+      --soft: #e1f6f5;
+      --radius: 7px;
+      --shadow: 0 1px 2px rgba(18, 47, 43, 0.04);
+    }
+
+    body {
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255, 255, 255, 0.97);
+      border-bottom-color: var(--color-border);
+      box-shadow: 0 1px 0 rgba(18, 47, 43, 0.03);
+    }
+
+    .topbar {
+      min-height: 64px;
+      padding: 10px 24px 8px;
+    }
+
+    .site-title-row { gap: 12px; }
+    .site-logo { width: 38px; height: 38px; border-radius: 8px; }
+    h1 { font-size: 20px; }
+    h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    h3 { font-size: 17px; font-weight: 700; }
+
+    .library-switcher {
+      flex-wrap: nowrap;
+      padding: 4px;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      background: var(--color-bg);
+    }
+
+    .library-switcher .small { margin-left: 8px; white-space: nowrap; }
+    .library-switcher select {
+      min-width: 190px;
+      min-height: 38px;
+      border: 0;
+      background: var(--color-card-bg);
+      color: var(--color-text-primary);
+      box-shadow: none;
+    }
+
+    nav {
+      padding: 0 24px 10px;
+      gap: 4px;
+      scrollbar-width: none;
+    }
+
+    nav::-webkit-scrollbar { display: none; }
+
+    .nav-btn {
+      min-height: 38px;
+      padding: 7px 14px;
+      border-color: transparent;
+      background: transparent;
+      color: var(--color-text-secondary);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .nav-btn:hover {
+      background: var(--color-primary-light);
+      color: var(--color-primary-dark);
+      border-color: transparent;
+    }
+
+    .nav-btn.active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: #ffffff;
+    }
+
+    main { padding: 20px 24px 44px; }
+    .grid { gap: 16px; }
+
+    .card {
+      padding: 18px;
+      border-color: var(--color-border);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+    }
+
+    button {
+      min-height: 44px;
+      border-radius: var(--radius-button);
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      padding: 9px 15px;
+      font-weight: 650;
+    }
+
+    button:hover { background: var(--color-primary-dark); border-color: var(--color-primary-dark); }
+    button.secondary { color: var(--color-primary-dark); border-color: var(--color-primary); }
+    button.ghost { color: var(--color-text-primary); border-color: var(--color-border); }
+    button.ghost:hover { background: var(--color-bg); border-color: #bfcfcb; }
+
+    input, select, textarea {
+      min-height: 44px;
+      background: #fff;
+      border-color: var(--color-border);
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(7, 157, 162, 0.14);
+    }
+
+    .stats { gap: 8px; }
+    .stat {
+      min-height: 64px;
+      padding: 9px 11px;
+      background: #f4fbfa;
+      border-color: transparent;
+      border-radius: 6px;
+    }
+    .stat .num { color: var(--color-primary-dark); }
+
+    .notice {
+      border-color: #d6e2df;
+      background: #eef9f8;
+      color: #32666a;
+    }
+
+    .tag { background: #eef2f1; color: #566460; }
+    .tag.new, .tag.review, .tag.multi { background: var(--color-primary-light); color: var(--color-primary-dark); }
+    .tag.wrong { background: var(--color-danger-light); color: var(--color-danger); }
+
+    .today-combined-bar {
+      padding: 16px 18px;
+      border: 1px solid #cce8e6;
+      border-left: 4px solid var(--color-primary);
+      background: #ffffff;
+      box-shadow: var(--shadow-card);
+    }
+
+    .today-combined-inner { gap: 18px; }
+    .today-divider { background: var(--color-border); }
+    .today-primary-stats { flex: 1.35; gap: 6px; }
+    .today-secondary-stats { flex: 1; gap: 6px; }
+
+    .today-primary-stats .stat,
+    .today-secondary-stats .stat {
+      min-height: 66px;
+      padding: 8px 10px;
+      background: #eef9f8;
+      border: 1px solid #d8efed;
+    }
+
+    .today-primary-stats .stat:first-child { background: #dff5f3; }
+    .today-primary-stats .stat .small,
+    .today-secondary-stats .stat .small { color: var(--color-text-secondary); }
+
+    .today-primary-stats .stat .num { color: var(--color-primary-dark); font-size: 26px; }
+    .today-secondary-stats .stat .num { color: var(--color-text-primary); font-size: 18px; }
+
+    .secondary-bar { padding: 10px 14px; background: #ffffff; }
+    .secondary-bar .stat { border-radius: 0; }
+
+    .player {
+      min-height: 390px;
+      padding: 28px 24px;
+      gap: 18px;
+      background: #f8fcfb;
+      border-color: var(--color-border);
+      border-radius: 8px;
+    }
+
+    .progress-big { font-size: 38px; color: var(--color-text-primary); }
+    .word-hidden { color: var(--color-text-secondary); }
+    .player-go-mark-btn { top: 0; right: 0; }
+
+    .answer-grid .notice {
+      min-height: 50px;
+      display: flex;
+      align-items: center;
+      background: var(--color-primary-light);
+      border-color: transparent;
+    }
+
+    .today-mobile-summary { display: none; }
+
+    .today-page-header > .row { gap: 14px; }
+    .today-page-actions { justify-content: flex-end; }
+
+    .task-meta-title {
+      margin-bottom: 7px;
+      font-weight: 650;
+    }
+
+    .task-meta-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .task-meta-controls input { width: 190px; }
+    .task-meta-controls button { white-space: nowrap; }
+
+    .player-settings-toggle { display: none; }
+
+    .player-settings-block {
+      display: grid;
+      place-items: center;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .player-actions,
+    .answer-toggle-row { justify-content: center; }
+
+    .settings-plan-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      align-items: end;
+      margin-bottom: 8px;
+    }
+
+    .settings-plan-grid label { min-width: 0; font-size: 14px; }
+
+    .tool-page-intro {
+      border-left: 4px solid var(--color-accent);
+      background: var(--color-accent-light);
+    }
+
+    .wrong-book-title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .wrong-count-summary {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .wrong-count-chip {
+      min-height: 32px;
+      padding: 4px 10px;
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      background: #ffffff;
+      color: var(--color-text-secondary);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .wrong-count-chip:hover,
+    .wrong-count-chip.active {
+      border-color: var(--color-primary);
+      background: var(--color-primary-light);
+      color: var(--color-primary-dark);
+    }
+
+    .wrong-rule-hint {
+      margin-top: 8px;
+      color: var(--color-text-secondary);
+      font-size: 12px;
+    }
+
+    .table-wrap {
+      border-radius: 8px;
+      border-color: var(--color-border);
+      box-shadow: none;
+    }
+
+    th { background: #eef3f1; color: #3c4d49; font-size: 13px; }
+    th, td { padding: 10px; }
+    tbody tr:hover td { background: #f7faf9; }
+
+    .collapsible-section { box-shadow: none; }
+    .section-toggle-title { font-size: 17px; font-weight: 700; }
+    .section-body { margin-top: 14px; padding-top: 16px; }
+
+    .danger-zone-section {
+      --danger: var(--color-danger);
+      --danger-soft: var(--color-danger-light);
+      --danger-border: rgba(200, 94, 85, 0.28);
+      border-top-width: 1px;
+      background: var(--color-danger-light);
+    }
+
+    .empty { padding: 36px 24px; border-radius: 8px; background: #f8faf9; }
+
+    @media (min-width: 821px) and (max-width: 1180px) {
+      :root { --content-width: 100%; }
+      .topbar, nav, main { padding-left: 18px; padding-right: 18px; }
+      .card { padding: 16px; }
+      .today-combined-inner { gap: 10px; }
+      .today-primary-stats .stat,
+      .today-secondary-stats .stat { padding: 7px 6px; }
+      .player { min-height: 350px; }
+    }
+
+    @media (max-width: 820px) {
+      header { position: static; }
+      .topbar { padding: 10px 14px 8px; }
+      nav { padding: 0 14px 9px; }
+      main { padding: 14px 12px 32px; }
+      .library-switcher { width: 100%; }
+      .library-switcher select { min-width: 0; flex: 1; }
+      .card { padding: 14px; }
+      .today-combined-bar { padding: 12px 13px; }
+      .today-combined-inner { display: none; }
+      .today-mobile-summary {
+        display: grid;
+        gap: 3px;
+      }
+      .today-mobile-summary strong { color: var(--color-primary-dark); font-size: 19px; }
+      .today-mobile-summary span { color: var(--color-text-primary); font-size: 13px; }
+      .today-mobile-summary small { color: var(--color-text-secondary); font-size: 11px; }
+      .player { min-height: 0; padding: 16px 10px; gap: 13px; }
+      .progress-big { font-size: 31px; }
+      .task-meta-controls {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 8px;
+      }
+      .task-meta-controls input,
+      .task-meta-controls button { width: 100%; height: 46px; margin: 0; }
+      .task-meta-note { grid-column: 1 / -1; }
+      .today-page-header > .row {
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .today-page-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 8px;
+      }
+      .today-page-actions button {
+        width: 100%;
+        min-height: 44px;
+        padding: 8px 9px;
+        font-size: 13px;
+      }
+      .player-settings-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .player-settings-block { display: none; }
+      .player-settings-block.is-open { display: grid; }
+      .answer-grid { grid-template-columns: 1fr; }
+      .answer-grid .notice {
+        min-width: 0;
+        max-height: 68px;
+        overflow: auto;
+        font-size: 14px;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+      }
+      .answer-toggle-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        width: 100%;
+      }
+      .answer-toggle-row button { width: 100%; padding: 8px 6px; }
+      .player-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        gap: 8px;
+      }
+      .player-actions button { width: 100%; padding: 8px 6px; }
+      .player-actions #playCurrentBtn { grid-column: 1 / -1; }
+      .settings-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .wrong-book-title-row { align-items: flex-start; }
+      .wrong-count-summary { width: 100%; }
+      .wrong-count-chip { flex: 1 1 calc(50% - 6px); }
+    }
   </style>
 </head>
 <body>
   <header>
     <div class="topbar">
       <div class="site-title-row">
-        <img src="/icons/app-icon.png" class="site-logo" alt="Capybara">
+        <img src="./public/icons/app-icon.png" class="site-logo" alt="Capybara">
         <h1>Capybara 英语听写</h1>
       </div>
       <div class="library-switcher">
@@ -2384,7 +2829,7 @@
     }
 
     function renderApp() {
-      if (viewName === "manual" || viewName === "tools") viewName = "settings";
+      if (viewName === "manual") viewName = "tools";
       renderNav();
       renderLibrarySelect();
       if (viewName === "library") renderLibraryManager();
@@ -2392,6 +2837,7 @@
       else if (viewName === "wrong") renderWrongBook();
       else if (viewName === "stats") renderStatistics();
       else if (viewName === "settings") renderSettings();
+      else if (viewName === "tools") renderTools();
     }
 
     function renderNav() {
@@ -2400,7 +2846,8 @@
         ["wrong", "错词本"],
         ["library", "词库"],
         ["stats", "统计"],
-        ["settings", "设置"]
+        ["settings", "设置"],
+        ["tools", "工具"]
       ];
       document.getElementById("mainNav").innerHTML = navItems.map(item => {
         return '<button class="nav-btn ' + (viewName === item[0] ? "active" : "") + '" data-view="' + item[0] + '">' + item[1] + '</button>';
@@ -2753,13 +3200,13 @@
 
       app.innerHTML = `
         <div class="grid">
-          <section class="card span-12">
+          <section class="card span-12 today-page-header">
             <div class="row between">
               <div>
                 <h2>今日听写</h2>
                 <div class="small muted">${escapeHtml(lib.libraryName)} · 下一次完成后记为 Day ${dayNumber}</div>
               </div>
-              <div class="row">
+              <div class="row today-page-actions">
                 ${task ? '<button class="secondary" id="regenerateTaskBtn">按当前设置重新生成今日任务</button>' : ''}
                 <button id="buildTaskBtn">${task ? "继续今日听写" : "生成/开始今日听写"}</button>
               </div>
@@ -2781,6 +3228,11 @@
                 <div class="stat"><div class="small muted">已学 / 总数</div><div class="num">${learned} / ${lib.words.length}</div></div>
                 <div class="stat"><div class="small muted">当前错词池</div><div class="num">${pendingCount}</div></div>
               </div>
+            </div>
+            <div class="today-mobile-summary">
+              <strong>今日 ${categoryCounts.total} 个</strong>
+              <span>新词 ${categoryCounts.new} · 错词复习 ${categoryCounts.wrong}${categoryCounts.review > 0 ? " · 到期复查 " + categoryCounts.review : ""}</span>
+              <small>Day ${dayNumber} · 已学 ${learned} / ${lib.words.length} · 错词池 ${pendingCount}</small>
             </div>
           </section>
           ` : `
@@ -2886,12 +3338,11 @@
 
       return `
         <section class="card span-12">
-          <div class="row" style="margin-top:4px">
-            <label style="max-width:220px">本次记录日期
-              <input id="taskDateInput" type="date" value="${escapeHtml(task.date || todayDate())}">
-            </label>
+          <div class="task-meta-title">本次记录日期</div>
+          <div class="task-meta-controls">
+            <input id="taskDateInput" type="date" aria-label="本次记录日期" value="${escapeHtml(task.date || todayDate())}">
             <button class="secondary" id="exportTodayTaskBtn">导出听写纸</button>
-            <span class="small muted">默认使用电脑日期，也可以手动改成实际听写日期。</span>
+            <span class="small muted task-meta-note">默认使用电脑日期，也可以手动改成实际听写日期。</span>
           </div>
           ${notices.map(text => '<div class="notice small" style="margin-top:10px">' + escapeHtml(text) + '</div>').join("")}
         </section>
@@ -2914,25 +3365,28 @@
               <div class="word-hidden">听写过程中不显示英文和中文释义</div>
               <button id="goMarkBtn" class="player-go-mark-btn">全部播放完成，进入标记错误</button>
             </div>
-            <div class="split" style="width:min(680px, 100%); text-align:left">
-              <label>语速：<span id="playerSpeechRateText">${Number(lib.settings.speechRate || 0.9).toFixed(1)}x</span>
-                <input id="playerSpeechRate" type="range" min="0.5" max="1.5" step="0.1" value="${escapeHtml(lib.settings.speechRate || 0.9)}">
-              </label>
-              <label>朗读声音
-                <select id="playerSpeechVoice" data-speech-voice-select style="width:auto">
-                  ${getSpeechVoiceOptionsHtml(lib.settings.speechVoiceName || "google-us")}
-                </select>
-              </label>
+            <button class="ghost player-settings-toggle" id="togglePlayerSettingsBtn" type="button">语速与声音</button>
+            <div class="player-settings-block" id="playerSettingsBlock">
+              <div class="split" style="width:min(680px, 100%); text-align:left">
+                <label>语速：<span id="playerSpeechRateText">${Number(lib.settings.speechRate || 0.9).toFixed(1)}x</span>
+                  <input id="playerSpeechRate" type="range" min="0.5" max="1.5" step="0.1" value="${escapeHtml(lib.settings.speechRate || 0.9)}">
+                </label>
+                <label>朗读声音
+                  <select id="playerSpeechVoice" data-speech-voice-select style="width:auto">
+                    ${getSpeechVoiceOptionsHtml(lib.settings.speechVoiceName || "google-us")}
+                  </select>
+                </label>
+              </div>
+              <div class="small muted">自动播放每个词播放 ${Number(lib.settings.autoPlayRepeatTimes || 1)} 次；声音不顺耳时可以临时切换。</div>
             </div>
-            <div class="small muted">自动播放每个词播放 ${Number(lib.settings.autoPlayRepeatTimes || 1)} 次；如果声音听着不顺耳，可以在这里当场切换。</div>
             <div class="stack" style="width:min(680px, 100%)">
-              <div class="row">
+              <div class="row answer-toggle-row">
                 <button class="${lib.settings.showAnswerEnglish ? "secondary" : "ghost"}" id="toggleEnglishBtn">${lib.settings.showAnswerEnglish ? "隐藏英文" : "显示英文"}</button>
                 <button class="${lib.settings.showAnswerMeaning ? "secondary" : "ghost"}" id="toggleMeaningBtn">${lib.settings.showAnswerMeaning ? "隐藏中文释义" : "显示中文释义"}</button>
               </div>
               <div id="answerRevealBox" class="answer-grid">${renderAnswerRevealHtml(currentWord, lib)}</div>
             </div>
-            <div class="row">
+            <div class="row player-actions">
               <button id="playCurrentBtn">播放 / 再听一遍</button>
               <button class="ghost" id="prevWordBtn" ${dictationIndex <= 0 ? "disabled" : ""}>上一个</button>
               <button class="ghost" id="nextWordBtn">${dictationIndex >= total - 1 ? "完成播放" : "下一个"}</button>
@@ -3032,6 +3486,14 @@
         stopAutoPlay();
         renderTodayView("mark");
       };
+      const playerSettingsToggle = document.getElementById("togglePlayerSettingsBtn");
+      const playerSettingsBlock = document.getElementById("playerSettingsBlock");
+      if (playerSettingsToggle && playerSettingsBlock) {
+        playerSettingsToggle.onclick = () => {
+          const isOpen = playerSettingsBlock.classList.toggle("is-open");
+          playerSettingsToggle.textContent = isOpen ? "收起语速与声音" : "语速与声音";
+        };
+      }
       const rateInput = document.getElementById("playerSpeechRate");
       const rateText = document.getElementById("playerSpeechRateText");
       if (rateInput) {
@@ -3259,7 +3721,20 @@
       const lib = getCurrentLibrary();
       const filter = document.getElementById("wrongFilter")?.value || "pending";
       const sort = document.getElementById("wrongSort")?.value || "count";
-      let words = lib.words.filter(word => word.wrongCount > 0 || word.isPendingWrong);
+      const allWrongWords = lib.words.filter(word => word.wrongCount > 0 || word.isPendingWrong);
+      const wrongCounts = {
+        pending: allWrongWords.filter(word => word.isPendingWrong).length,
+        all: allWrongWords.length,
+        focus: allWrongWords.filter(word => word.isFocus).length,
+        stubborn: allWrongWords.filter(word => word.isStubborn).length
+      };
+      const filterLabels = {
+        pending: "当前错词池",
+        all: "全部错词",
+        focus: "重点错词",
+        stubborn: "顽固错词"
+      };
+      let words = allWrongWords.slice();
       if (filter === "pending") words = words.filter(word => word.isPendingWrong);
       if (filter === "focus") words = words.filter(word => word.isFocus);
       if (filter === "stubborn") words = words.filter(word => word.isStubborn);
@@ -3275,14 +3750,23 @@
           <section class="card span-12">
             <div class="row between">
               <div>
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:0">
+                <div class="wrong-book-title-row">
                   <h2 style="margin-bottom:0">错词本</h2>
                   <button type="button" class="info-btn" id="wrongBookHelpBtn" style="margin-bottom:0" title="查看说明">?</button>
+                  <div class="wrong-count-summary" aria-label="错词数量统计">
+                    ${Object.entries(filterLabels).map(([key, label]) => `
+                      <button type="button" class="wrong-count-chip ${filter === key ? "active" : ""}" data-wrong-filter-chip="${key}">
+                        ${label} ${wrongCounts[key]}
+                      </button>
+                    `).join("")}
+                  </div>
                 </div>
+                <div class="wrong-rule-hint">自动规则：累计错误 2 次标记为重点，3 次标记为顽固；手动设置的状态优先。</div>
                 <div class="info-box" id="wrongBookHelp" style="display:none; margin-top:8px; margin-bottom:0">
                   这里保留历史上所有曾经错过的词，和当前错词池分开管理。<br>
+                  重点词默认指累计错误达到 2 次的词；顽固词默认指累计错误达到 3 次的词。两种状态都可以手动调整。<br>
                   移出错词池后，这个词不再每天强制复习，但历史错误次数仍保留。<br>
-                  如果这个词是当时误标为错误，请到 设置 → 手动校准 → 历史记录修改 中修正对应 Day 的错词勾选，系统会自动重算错误次数和错词池。
+                  如果这个词是当时误标为错误，请到 工具 → 手动校准 → 历史记录修改 中修正对应 Day 的错词勾选，系统会自动重算错误次数和错词池。
                 </div>
               </div>
               <div class="row">
@@ -3315,13 +3799,20 @@
       document.getElementById("wrongSort").value = sort;
       document.getElementById("wrongFilter").onchange = renderWrongBook;
       document.getElementById("wrongSort").onchange = renderWrongBook;
+      document.querySelectorAll("[data-wrong-filter-chip]").forEach(button => {
+        button.onclick = () => {
+          const select = document.getElementById("wrongFilter");
+          if (select) select.value = button.dataset.wrongFilterChip;
+          renderWrongBook();
+        };
+      });
       document.getElementById("wrongBookHelpBtn").onclick = () => {
         const box = document.getElementById("wrongBookHelp");
         if (box) box.style.display = box.style.display === "none" ? "" : "none";
       };
       document.getElementById("exportWrongWordsBtn").onclick = () => {
-        const filterLabels = { all: "全部", pending: "当前错词池", focus: "重点", stubborn: "顽固" };
-        exportWrongWordsToCsv(lib, words, filterLabels[filter] || "错词");
+        const exportLabels = { all: "全部", pending: "当前错词池", focus: "重点", stubborn: "顽固" };
+        exportWrongWordsToCsv(lib, words, exportLabels[filter] || "错词");
       };
       bindWrongActions();
     }
@@ -4360,12 +4851,17 @@
       downloadCsv(rows, lib.libraryName + "_" + label + "_错词.csv");
     }
 
-    function renderSettings() {
+    function renderTools() {
+      renderSettings({ toolsOnly: true });
+    }
+
+    function renderSettings(options = {}) {
+      const toolsOnly = Boolean(options.toolsOnly);
       const lib = getCurrentLibrary();
       const s = lib.settings;
       document.getElementById("app").innerHTML = `
         <div class="grid">
-          <section class="card span-12">
+          <section class="card span-12 settings-only-section">
             <div class="row between">
               <div>
                 <h2>设置</h2>
@@ -4374,19 +4870,19 @@
             </div>
           </section>
 
-          <section class="card span-12">
+          <section class="card span-12 settings-only-section">
             <h3>学习计划</h3>
-            <div style="display:flex; gap:8px; flex-wrap:nowrap; align-items:end; margin-bottom:8px">
-              <label style="flex:1; min-width:0; font-size:14px">当天新词数
+            <div class="settings-plan-grid">
+              <label>当天新词数
                 <input data-setting="dailyTargetWords" type="number" min="0" max="100" step="5" value="${escapeHtml(s.dailyTargetWords ?? 30)}">
               </label>
-              <label style="flex:1; min-width:0; font-size:14px">当天到期复查数
+              <label>当天到期复查数
                 <input data-setting="dailyReviewWords" type="number" min="0" max="100" step="5" value="${escapeHtml(s.dailyReviewWords ?? 30)}">
               </label>
-              <label style="flex:1; min-width:0; font-size:14px">延迟复查天数
+              <label>延迟复查天数
                 <input data-setting="reviewDelayDays" type="number" min="1" max="365" step="1" value="${escapeHtml(s.reviewDelayDays)}">
               </label>
-              <label style="flex:1; min-width:0; font-size:14px">错词移出错词池次数
+              <label>错词移出错词池次数
                 <input data-setting="correctTimesToExitWrongPool" type="number" min="1" max="10" step="1" value="${escapeHtml(s.correctTimesToExitWrongPool)}">
               </label>
             </div>
@@ -4396,7 +4892,7 @@
             </label>
           </section>
 
-          <section class="card span-12">
+          <section class="card span-12 settings-only-section">
             <h3>播放设置</h3>
             <div class="grid" style="gap:8px">
               <label class="span-4">播放顺序
@@ -4529,6 +5025,30 @@
           </section>
         </div>
       `;
+      const app = document.getElementById("app");
+      if (toolsOnly) {
+        app.querySelectorAll(".settings-only-section").forEach(section => section.remove());
+        const toolsGrid = app.querySelector(".grid");
+        if (toolsGrid) {
+          toolsGrid.insertAdjacentHTML("afterbegin", `
+            <section class="card span-12 tool-page-intro">
+              <h2>工具</h2>
+              <div class="small muted">云端同步、数据备份、历史补录与危险操作都集中在这里。日常听写不需要使用。</div>
+            </section>
+          `);
+        }
+        document.querySelectorAll("[data-manual-tab]").forEach(button => {
+          button.onclick = () => renderManualTab(button.dataset.manualTab);
+        });
+        renderManualTab("batch");
+        bindStatisticsBackupEvents(lib);
+        setupToolsSections();
+        if (window.cloudSync && typeof window.cloudSync.mount === "function") {
+          window.cloudSync.mount();
+        }
+        return;
+      }
+      app.querySelectorAll(".collapsible-section").forEach(section => section.remove());
       document.getElementById("saveSettingsBtn").onclick = () => {
         const updates = {};
         document.querySelectorAll("[data-setting]").forEach(input => {
@@ -4554,15 +5074,6 @@
         settingsRate.oninput = () => settingsRateText.textContent = Number(settingsRate.value).toFixed(1) + "x";
       }
       hydrateSpeechVoiceSelects();
-      document.querySelectorAll("[data-manual-tab]").forEach(button => {
-        button.onclick = () => renderManualTab(button.dataset.manualTab);
-      });
-      renderManualTab("batch");
-      bindStatisticsBackupEvents(lib);
-      setupToolsSections();
-      if (window.cloudSync && typeof window.cloudSync.mount === "function") {
-        window.cloudSync.mount();
-      }
     }
 
     function numberField(key, labelText, value, min, max, step = 1) {
