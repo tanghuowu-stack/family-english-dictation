@@ -734,7 +734,7 @@
     .settings-voice-actions {
       grid-column: span 8;
       display: grid;
-      grid-template-columns: minmax(180px, 1fr) auto minmax(220px, 1.5fr);
+      grid-template-columns: auto auto minmax(220px, 1fr);
       gap: 8px;
       align-items: end;
     }
@@ -1137,8 +1137,45 @@
 
     .today-mobile-summary { display: none; }
 
-    .today-page-header > .row { gap: 14px; }
-    .today-page-actions { justify-content: flex-end; }
+    .today-page-header > .row {
+      align-items: flex-start;
+      justify-content: flex-start;
+      gap: 18px;
+    }
+
+    .today-heading-block {
+      min-width: 0;
+      flex: 0 0 auto;
+    }
+
+    .today-header-controls {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-left: auto;
+    }
+
+    .today-heading-block h2 { margin-bottom: 7px; }
+
+    .today-date-field {
+      width: 176px;
+      gap: 3px;
+    }
+
+    .today-date-field input { min-height: 40px; }
+
+    .today-date-field .small {
+      line-height: 1.2;
+      margin-left: 2px;
+    }
+
+    .today-header-controls > button {
+      min-height: 40px;
+      margin-top: 22px;
+      white-space: nowrap;
+    }
 
     .task-meta-title {
       margin-bottom: 7px;
@@ -1164,6 +1201,290 @@
       width: 100%;
     }
 
+    .player-audio-settings {
+      grid-template-columns: 240px auto;
+      column-gap: 76px;
+      width: min(650px, 100%);
+      text-align: left;
+    }
+
+    .player-rate-control { width: 240px; }
+
+    .auto-play-control {
+      position: relative;
+      min-width: 0;
+    }
+
+    .auto-play-control > button { width: 100%; }
+
+    .auto-play-toggle.is-active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: #ffffff;
+    }
+
+    .auto-play-menu {
+      position: absolute;
+      z-index: 20;
+      left: 50%;
+      bottom: calc(100% + 8px);
+      display: grid;
+      gap: 9px;
+      width: 270px;
+      padding: 10px;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 8px 24px rgba(31, 50, 46, 0.14);
+      transform: translateX(-50%);
+    }
+
+    .auto-play-menu[hidden] { display: none; }
+
+    .auto-play-choice-row {
+      display: grid;
+      grid-template-columns: 58px repeat(5, minmax(32px, 1fr));
+      align-items: center;
+      gap: 4px;
+    }
+
+    .auto-play-choice-row.interval-row { grid-template-columns: 58px repeat(4, minmax(36px, 1fr)); }
+
+    .auto-play-choice-label {
+      color: var(--color-text-secondary);
+      font-size: 12px;
+      text-align: left;
+    }
+
+    .auto-play-menu button {
+      min-height: 34px;
+      padding: 4px;
+      font-size: 12px;
+    }
+
+    .auto-play-menu button.is-selected {
+      background: var(--color-primary-light);
+      border-color: var(--color-primary);
+      color: var(--color-primary-dark);
+    }
+
+    .auto-play-menu-start { width: 100%; }
+
+    .voice-control {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .voice-control-label {
+      font-size: 14px;
+      color: var(--color-text-primary);
+    }
+
+    .voice-segmented {
+      display: inline-grid;
+      grid-template-columns: repeat(2, minmax(82px, 1fr));
+      gap: 6px;
+      width: fit-content;
+      max-width: 100%;
+    }
+
+    .voice-segmented button {
+      min-height: 40px;
+      padding: 7px 18px;
+      white-space: nowrap;
+    }
+
+    .voice-segmented button.is-active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: #ffffff;
+    }
+
+    .settings-rate-control { width: min(430px, 100%); }
+
+    .statistics-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .statistics-header-row h2 { margin: 0; }
+
+    .statistics-inline-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(150px, 1fr));
+      gap: 8px;
+      width: min(620px, 100%);
+    }
+
+    .statistics-inline-stats .stat {
+      min-height: 54px;
+      padding: 7px 10px;
+    }
+
+    .statistics-inline-stats .num { font-size: 19px; }
+
+    .tool-compact-section .section-body {
+      margin-top: 10px;
+      padding-top: 10px;
+    }
+
+    .tool-compact-section .row,
+    .tool-compact-section .stack,
+    .tool-compact-section .tabs { gap: 7px; }
+
+    .tool-compact-section .tabs { margin-bottom: 7px; }
+
+    .tool-compact-section button {
+      min-height: 36px;
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+
+    .tool-compact-section input,
+    .tool-compact-section select {
+      min-height: 38px;
+      padding: 7px 9px;
+    }
+
+    .tool-compact-section .stat {
+      min-height: 48px;
+      padding: 6px 9px;
+    }
+
+    .tool-compact-section .stat .num { font-size: 18px; }
+
+    .tool-compact-section #manualContent { margin-top: 8px !important; }
+
+    .tool-compact-section #manualContent > .stack > button {
+      width: auto;
+      justify-self: start;
+    }
+
+    .cloud-account-row {
+      display: grid;
+      grid-template-columns: 125px minmax(180px, 1.1fr) minmax(150px, 1fr) minmax(140px, .9fr) auto auto;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .cloud-status-item {
+      min-width: 0;
+      min-height: 38px;
+      padding: 5px 8px;
+      border: 1px solid var(--color-border);
+      border-radius: 7px;
+      background: var(--color-primary-light);
+    }
+
+    .cloud-status-item .strong {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
+    .cloud-account-row label {
+      min-width: 0;
+      font-size: 12px;
+    }
+
+    .cloud-action-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .manual-tabs {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      padding-bottom: 2px;
+    }
+
+    .manual-tabs button { flex: 0 0 auto; }
+
+    .manual-setup-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(150px, 1fr)) auto;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .manual-setup-grid label { min-width: 0; }
+
+    .settings-toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 26px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
+
+    .settings-toggle-row .checkbox-row { margin: 0; }
+
+    .library-manage-toolbar {
+      display: grid;
+      grid-template-columns: auto auto minmax(250px, 420px) auto auto auto;
+      align-items: end;
+      gap: 9px;
+    }
+
+    .library-manage-toolbar h3 {
+      align-self: end;
+      display: flex;
+      align-items: center;
+      min-height: 40px;
+      margin: 0 4px 0 2px;
+      white-space: nowrap;
+    }
+
+    .library-manage-toolbar label {
+      min-width: 0;
+      font-size: 12px;
+    }
+
+    .library-manage-toolbar button {
+      min-height: 40px;
+      padding: 7px 12px;
+      white-space: nowrap;
+    }
+
+    .library-import-panel {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--color-border);
+    }
+
+    .library-import-panel[hidden] { display: none; }
+
+    .library-import-heading {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .library-import-heading h3 { margin: 0; }
+
+    .library-import-panel textarea {
+      min-height: 280px;
+      line-height: 1.6;
+    }
+
+    .library-import-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
     .player-actions,
     .answer-toggle-row { justify-content: center; }
 
@@ -1182,11 +1503,67 @@
       background: var(--color-accent-light);
     }
 
-    .wrong-book-title-row {
+    .wrong-book-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .wrong-book-heading {
       display: flex;
       align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+
+    .wrong-book-left { min-width: 0; }
+
+    .wrong-book-controls {
+      display: grid;
+      grid-template-columns: 150px 230px;
+      align-items: end;
+      justify-content: end;
+      gap: 9px;
+      min-width: 0;
+      margin-top: 24px;
+    }
+
+    .wrong-book-controls label {
+      min-width: 0;
+      font-size: 12px;
+    }
+
+    .app-dialog {
+      position: fixed;
+      inset: 0;
+      width: min(430px, calc(100vw - 32px));
+      margin: auto;
+      padding: 0;
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      background: #ffffff;
+      color: var(--color-text-primary);
+      box-shadow: 0 18px 60px rgba(22, 39, 35, 0.24);
+    }
+
+    .app-dialog::backdrop { background: rgba(24, 35, 33, 0.46); }
+
+    .app-dialog form {
+      display: grid;
+      gap: 16px;
+      padding: 22px;
+    }
+
+    .app-dialog h3 { margin: 0; }
+
+    #confirmActionMessage,
+    #messageDialogText { white-space: pre-wrap; }
+
+    .app-dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
     }
 
     .wrong-count-summary {
@@ -1194,6 +1571,7 @@
       align-items: center;
       gap: 6px;
       flex-wrap: wrap;
+      margin-top: 10px;
     }
 
     .wrong-count-chip {
@@ -1278,6 +1656,13 @@
       .today-primary-stats .stat,
       .today-secondary-stats .stat { padding: 7px 6px; }
       .player { min-height: 350px; }
+      .today-page-header > .row { flex-wrap: wrap; }
+      .today-header-controls { flex: 1 1 100%; }
+      .wrong-book-header { align-items: flex-start; }
+      .wrong-book-controls { grid-template-columns: 150px minmax(210px, 1fr); }
+      .cloud-account-row {
+        grid-template-columns: 115px minmax(160px, 1fr) minmax(140px, 1fr) minmax(130px, .8fr) auto auto;
+      }
     }
 
     @media (max-width: 820px) {
@@ -1307,22 +1692,21 @@
       .task-meta-controls input,
       .task-meta-controls button { width: 100%; height: 46px; margin: 0; }
       .task-meta-note { grid-column: 1 / -1; }
-      .today-page-header > .row {
-        align-items: flex-start;
-        gap: 10px;
-      }
-      .today-page-actions {
+      .today-page-header > .row { gap: 12px; }
+      .today-header-controls {
         width: 100%;
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: 8px;
       }
-      .today-page-actions button {
+      .today-date-field { width: 100%; }
+      .today-header-controls > button {
         width: 100%;
         min-height: 44px;
         padding: 8px 9px;
         font-size: 13px;
       }
+      .today-header-controls > button:nth-of-type(n + 2) { margin-top: 0; }
       .player-settings-toggle {
         display: inline-flex;
         align-items: center;
@@ -1330,6 +1714,10 @@
       }
       .player-settings-block { display: none; }
       .player-settings-block.is-open { display: grid; }
+      .player-audio-settings { grid-template-columns: 1fr; row-gap: 14px; }
+      .player-rate-control { width: min(280px, 100%); }
+      .voice-segmented { width: 100%; }
+      .voice-segmented button { width: 100%; min-height: 40px; }
       .answer-grid { grid-template-columns: 1fr; }
       .answer-grid .notice {
         min-width: 0;
@@ -1353,14 +1741,79 @@
       }
       .player-actions button { width: 100%; padding: 8px 6px; }
       .player-actions #playCurrentBtn { grid-column: 1 / -1; }
+      .player-actions .auto-play-control { grid-column: 1 / -1; }
       .settings-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .wrong-book-title-row { align-items: flex-start; }
-      .wrong-count-summary { width: 100%; }
-      .wrong-count-chip { flex: 1 1 calc(50% - 6px); }
+      .settings-rate-control { grid-column: span 12; width: 76%; min-width: 220px; }
+      .statistics-header-row { align-items: flex-start; flex-direction: column; }
+      .statistics-inline-stats {
+        width: 100%;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .statistics-inline-stats .stat { min-width: 0; padding: 6px 7px; }
+      .statistics-inline-stats .small { font-size: 10px; }
+      .statistics-inline-stats .num { font-size: 16px; }
+      .tool-compact-section .section-body { margin-top: 8px; padding-top: 8px; }
+      .tool-compact-section .tabs button { flex: 0 0 auto; }
+      .tool-compact-section .row.mobile-full button {
+        width: auto;
+        min-height: 38px;
+        flex: 1 1 calc(50% - 7px);
+      }
+      .cloud-account-row {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+      .cloud-account-row label { grid-column: span 1; }
+      .cloud-action-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+      .cloud-action-row button { width: 100%; }
+      .manual-setup-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+      .manual-setup-grid button { width: 100%; }
+      .library-manage-toolbar {
+        grid-template-columns: auto auto minmax(220px, 1fr) auto auto;
+      }
+      .library-manage-toolbar #toggleWordImportBtn { grid-column: 1 / -1; width: fit-content; }
+      .wrong-book-header {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .wrong-book-controls {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        justify-content: stretch;
+      }
+      .wrong-count-summary {
+        width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 3px;
+      }
+      .wrong-count-chip { flex: 0 0 auto; }
       .wrong-bulk-toolbar { align-items: stretch; }
       .wrong-bulk-toolbar .checkbox-row { width: 100%; margin-right: 0; }
       .wrong-bulk-toolbar button { flex: 1 1 calc(50% - 6px); }
       .wrong-bulk-count { display: flex; align-items: center; }
+      .settings-toggle-row { gap: 12px 20px; }
+    }
+
+    @media (max-width: 520px) {
+      .today-header-controls > button { margin-top: 0; }
+      .today-header-controls .today-date-field { grid-column: 1 / -1; }
+      .today-header-controls .today-date-field + button { margin-top: 0; }
+      .cloud-account-row label { grid-column: 1 / -1; }
+      .manual-setup-grid { grid-template-columns: 1fr; }
+      .settings-toggle-row { display: grid; grid-template-columns: 1fr; }
+      .library-manage-toolbar {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+      .library-manage-toolbar h3 { order: -1; }
+      .library-manage-toolbar label { grid-column: 1 / -1; }
+      .library-manage-toolbar button { width: 100%; }
+      .library-manage-toolbar #newLibraryBtn { order: -1; }
+      .library-manage-toolbar #toggleWordImportBtn { grid-column: 1 / -1; width: 100%; }
+      .library-import-heading { display: grid; gap: 3px; }
+      .library-import-panel textarea { min-height: 220px; }
     }
   </style>
 </head>
@@ -1380,6 +1833,38 @@
   </header>
 
   <main id="app"></main>
+
+  <dialog class="app-dialog" id="newLibraryDialog">
+    <form method="dialog">
+      <h3>请输入新词库名称</h3>
+      <input id="newLibraryNameInput" type="text" value="新词库" required autocomplete="off">
+      <div class="app-dialog-actions">
+        <button class="ghost" id="cancelNewLibraryDialogBtn" type="button">取消</button>
+        <button type="submit" value="confirm">确定</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="app-dialog" id="confirmActionDialog">
+    <form method="dialog">
+      <h3 id="confirmActionTitle">请确认操作</h3>
+      <div id="confirmActionMessage"></div>
+      <div class="app-dialog-actions">
+        <button class="ghost" id="cancelConfirmActionBtn" type="button">取消</button>
+        <button class="danger" type="submit" value="confirm">确定</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="app-dialog" id="messageDialog">
+    <form method="dialog">
+      <h3>提示</h3>
+      <div id="messageDialogText"></div>
+      <div class="app-dialog-actions">
+        <button type="submit" value="confirm">知道了</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"
     integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz"
@@ -1451,6 +1936,71 @@
     let editingRecordDay = null;
     let availableSpeechVoices = [];
     let selectedWrongBookWordIds = new Set();
+    let libraryImportExpanded = false;
+    const appMessageQueue = [];
+    let appMessageVisible = false;
+
+    function processAppMessageQueue() {
+      if (appMessageVisible || !appMessageQueue.length) return;
+      const dialog = document.getElementById("messageDialog");
+      const messageElement = document.getElementById("messageDialogText");
+      if (!dialog || !messageElement || typeof dialog.showModal !== "function") return;
+      appMessageVisible = true;
+      messageElement.textContent = appMessageQueue.shift();
+      dialog.addEventListener("close", () => {
+        appMessageVisible = false;
+        processAppMessageQueue();
+      }, { once: true });
+      dialog.showModal();
+    }
+
+    window.alert = message => {
+      appMessageQueue.push(String(message ?? ""));
+      processAppMessageQueue();
+    };
+
+    function requestNewLibraryName() {
+      const dialog = document.getElementById("newLibraryDialog");
+      const input = document.getElementById("newLibraryNameInput");
+      const cancelButton = document.getElementById("cancelNewLibraryDialogBtn");
+      if (!dialog || !input || !cancelButton || typeof dialog.showModal !== "function") {
+        alert("当前浏览器不支持新建词库对话框，请更新浏览器后重试。");
+        return Promise.resolve("");
+      }
+      input.value = "新词库";
+      dialog.returnValue = "";
+      cancelButton.onclick = () => dialog.close("cancel");
+      return new Promise(resolve => {
+        dialog.addEventListener("close", () => {
+          resolve(dialog.returnValue === "confirm" ? input.value.trim() : "");
+        }, { once: true });
+        dialog.showModal();
+        requestAnimationFrame(() => {
+          input.focus();
+          input.select();
+        });
+      });
+    }
+
+    function requestAppConfirmation(message, title = "请确认操作") {
+      const dialog = document.getElementById("confirmActionDialog");
+      const titleElement = document.getElementById("confirmActionTitle");
+      const messageElement = document.getElementById("confirmActionMessage");
+      const cancelButton = document.getElementById("cancelConfirmActionBtn");
+      if (!dialog || !titleElement || !messageElement || !cancelButton || typeof dialog.showModal !== "function") {
+        return Promise.resolve(false);
+      }
+      titleElement.textContent = title;
+      messageElement.textContent = message;
+      dialog.returnValue = "";
+      cancelButton.onclick = () => dialog.close("cancel");
+      return new Promise(resolve => {
+        dialog.addEventListener("close", () => resolve(dialog.returnValue === "confirm"), { once: true });
+        dialog.showModal();
+      });
+    }
+
+    window.requestAppConfirmation = requestAppConfirmation;
 
     function uid(prefix) {
       return prefix + "_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
@@ -1893,12 +2443,12 @@
       }
     }
 
-    function deleteLibrary(libraryId) {
+    async function deleteLibrary(libraryId) {
       const lib = data.libraries.find(item => item.libraryId === libraryId);
       if (!lib) return;
-      const first = confirm("确定要删除词库“" + lib.libraryName + "”吗？这个操作不能撤销。");
+      const first = await requestAppConfirmation("确定要删除词库“" + lib.libraryName + "”吗？这个操作不能撤销。", "删除词库");
       if (!first) return;
-      const second = confirm("请再次确认：删除后该词库的单词、进度和错词记录都会消失。");
+      const second = await requestAppConfirmation("删除后，该词库的单词、进度和错词记录都会消失。", "再次确认删除");
       if (!second) return;
       data.libraries = data.libraries.filter(item => item.libraryId !== libraryId);
       if (!data.libraries.length) createLibrary("我的词库", false);
@@ -2366,6 +2916,30 @@
       }).join("");
     }
 
+    function renderSpeechVoiceButtons(selectedName = "", scope = "settings") {
+      const selectedPresetId = getVoicePresetById(selectedName) ? selectedName : "google-us";
+      return `
+        <div class="voice-segmented" role="group" aria-label="朗读声音">
+          ${RECOMMENDED_VOICE_PRESETS.map(preset => `
+            <button type="button"
+              class="${preset.id === selectedPresetId ? "is-active" : "ghost"}"
+              data-speech-voice-button="${escapeHtml(preset.id)}"
+              data-speech-voice-scope="${escapeHtml(scope)}"
+              aria-pressed="${preset.id === selectedPresetId ? "true" : "false"}">${escapeHtml(preset.label)}</button>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function updateSpeechVoiceButtonStates(scope, selectedName) {
+      const selectedPresetId = getVoicePresetById(selectedName) ? selectedName : "google-us";
+      document.querySelectorAll('[data-speech-voice-scope="' + scope + '"]').forEach(button => {
+        const active = button.dataset.speechVoiceButton === selectedPresetId;
+        button.className = active ? "is-active" : "ghost";
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+    }
+
     function hydrateSpeechVoiceSelects() {
       const lib = getCurrentLibrary();
       if (!lib) return;
@@ -2375,6 +2949,10 @@
         select.innerHTML = getSpeechVoiceOptionsHtml(current);
         select.value = current;
       });
+      const current = getVoicePresetById(lib.settings.speechVoiceName) ? lib.settings.speechVoiceName : "google-us";
+      updateSpeechVoiceButtonStates("player", current);
+      const settingsValue = document.getElementById("settingsSpeechVoiceValue")?.value || current;
+      updateSpeechVoiceButtonStates("settings", settingsValue);
     }
 
     function speakWord(wordText) {
@@ -2411,11 +2989,11 @@
       renderTodayView("player");
     }
 
-    function regenerateTodayTaskFromSettings(options = {}) {
+    async function regenerateTodayTaskFromSettings(options = {}) {
       const lib = getCurrentLibrary();
       if (!lib || !lib.currentDraftTask) return;
       if (!options.skipConfirm) {
-        const ok = confirm("确定要按当前设置重新生成今日任务吗？这不会增加 Day，也不会写入记录。");
+        const ok = await requestAppConfirmation("确定要按当前设置重新生成今日任务吗？这不会增加 Day，也不会写入记录。");
         if (!ok) return;
       }
       const taskDate = lib.currentDraftTask.date || todayDate();
@@ -2453,13 +3031,13 @@
       }
     }
 
-    function undoLatestDailyRecord() {
+    async function undoLatestDailyRecord() {
       const lib = getCurrentLibrary();
       if (!lib || !lib.dailyRecords.length) {
         alert("没有可撤销的完成记录。");
         return;
       }
-      const ok = confirm("确定要撤销最近一次完成记录吗？这会删除最后一天的记录，并重新计算词库状态。");
+      const ok = await requestAppConfirmation("确定要撤销最近一次完成记录吗？这会删除最后一天的记录，并重新计算词库状态。");
       if (!ok) return;
       const latest = lib.dailyRecords.slice().sort((a, b) => {
         const dayOrder = Number(b.dayNumber || 0) - Number(a.dayNumber || 0);
@@ -2699,7 +3277,7 @@
       }
     }
 
-    function deleteWordFromLibrary(lib, wordId) {
+    async function deleteWordFromLibrary(lib, wordId) {
       const word = getWordById(lib, wordId);
       if (!word) return;
       const hasRecords = lib.dailyRecords.some(record => {
@@ -2715,7 +3293,7 @@
       const message = hasRecords
         ? "确定删除“" + word.word + "”吗？它已经出现在历史听写记录中，删除后会从历史记录里移除并重新计算词库状态。"
         : "确定删除“" + word.word + "”吗？";
-      if (!confirm(message)) return;
+      if (!await requestAppConfirmation(message)) return;
       lib.words = lib.words.filter(item => item.id !== wordId);
       lib.words.forEach((item, index) => item.index = index);
       lib.dailyRecords.forEach(record => removeWordIdFromTaskLike(record, wordId));
@@ -2731,12 +3309,12 @@
       renderLibraryManager();
     }
 
-    function addManualRecord(task, wrongWordIds, source = "manual") {
+    async function addManualRecord(task, wrongWordIds, source = "manual") {
       const lib = getCurrentLibrary();
       if (!lib) return;
       const existing = lib.dailyRecords.find(record => Number(record.dayNumber) === Number(task.dayNumber));
       if (existing) {
-        const ok = confirm("Day " + task.dayNumber + " 已有记录。继续会覆盖这一天的历史记录，并重新计算词库状态。");
+        const ok = await requestAppConfirmation("Day " + task.dayNumber + " 已有记录。继续会覆盖这一天的历史记录，并重新计算词库状态。");
         if (!ok) return;
         lib.dailyRecords = lib.dailyRecords.filter(record => Number(record.dayNumber) !== Number(task.dayNumber));
       }
@@ -2800,7 +3378,7 @@
       };
     }
 
-    function startBatchManualBackfill() {
+    async function startBatchManualBackfill() {
       const lib = getCurrentLibrary();
       if (!lib.words.length) {
         alert("请先在词库中导入单词。");
@@ -2814,7 +3392,7 @@
         .filter(record => Number(record.dayNumber) >= startDay && Number(record.dayNumber) < startDay + totalDays)
         .map(record => record.dayNumber);
       if (existingDays.length) {
-        const ok = confirm("这些 Day 已有记录：" + existingDays.join("、") + "。继续补录时，同一天保存会覆盖原记录并重新计算。");
+        const ok = await requestAppConfirmation("这些 Day 已有记录：" + existingDays.join("、") + "。继续补录时，同一天保存会覆盖原记录并重新计算。");
         if (!ok) return;
       }
       manualBatchSession = {
@@ -2827,14 +3405,14 @@
       renderBatchManualTab();
     }
 
-    function saveBatchManualDay() {
+    async function saveBatchManualDay() {
       const lib = getCurrentLibrary();
       if (!manualBatchSession || !manualBatchSession.currentTask) return;
       const task = manualBatchSession.currentTask;
       const wrongIds = Array.from(document.querySelectorAll("[data-batch-wrong]:checked")).map(input => input.value);
       const existing = lib.dailyRecords.find(record => Number(record.dayNumber) === Number(task.dayNumber));
       if (existing) {
-        const ok = confirm("Day " + task.dayNumber + " 已有记录。保存会覆盖这一天并重新计算，确定吗？");
+        const ok = await requestAppConfirmation("Day " + task.dayNumber + " 已有记录。保存会覆盖这一天并重新计算，确定吗？");
         if (!ok) return;
         lib.dailyRecords = lib.dailyRecords.filter(record => Number(record.dayNumber) !== Number(task.dayNumber));
       }
@@ -2858,7 +3436,7 @@
       renderBatchManualTab();
     }
 
-    function quickCalibrateProgress() {
+    async function quickCalibrateProgress() {
       const lib = getCurrentLibrary();
       const count = Math.max(0, Math.min(lib.words.length, Number(document.getElementById("quickCount").value || 0)));
       const scheduleReviews = document.getElementById("quickScheduleReviews").checked;
@@ -2867,7 +3445,7 @@
         alert("请先输入已完成到第几个单词。");
         return;
       }
-      const ok = confirm("快速校准会追加近似历史记录，并重新计算词库状态。继续吗？");
+      const ok = await requestAppConfirmation("快速校准会追加近似历史记录，并重新计算词库状态。继续吗？");
       if (!ok) return;
 
       const wrongIds = new Set();
@@ -2952,7 +3530,7 @@
       return JSON.stringify(lib, null, 2);
     }
 
-    function importLibrary(jsonText, replaceCurrent = false) {
+    async function importLibrary(jsonText, replaceCurrent = false) {
       let imported;
       try {
         imported = JSON.parse(jsonText);
@@ -2964,7 +3542,7 @@
         alert("这不是有效的词库 JSON。");
         return;
       }
-      const ok = confirm(replaceCurrent ? "导入会覆盖当前词库，确定继续吗？" : "确定导入这个词库吗？");
+      const ok = await requestAppConfirmation(replaceCurrent ? "导入会覆盖当前词库，确定继续吗？" : "确定导入这个词库吗？");
       if (!ok) return;
       migrateLibrary(imported);
       migrateWrongReviewRule(imported, { preserveDraft: true });
@@ -2989,7 +3567,7 @@
       return JSON.stringify(data, null, 2);
     }
 
-    function importAllData(jsonText) {
+    async function importAllData(jsonText) {
       let imported;
       try {
         imported = JSON.parse(jsonText);
@@ -3001,9 +3579,9 @@
         alert("这不是有效的全部数据 JSON。");
         return;
       }
-      const first = confirm("导入全部数据会覆盖本网站当前所有数据。确定继续吗？");
+      const first = await requestAppConfirmation("导入全部数据会覆盖本网站当前所有数据。确定继续吗？");
       if (!first) return;
-      const second = confirm("请再次确认：当前所有词库、进度和错词记录都会被替换。");
+      const second = await requestAppConfirmation("请再次确认：当前所有词库、进度和错词记录都会被替换。");
       if (!second) return;
       applyAllDataImportObject(imported);
     }
@@ -3080,33 +3658,32 @@
       const app = document.getElementById("app");
       app.innerHTML = `
         <div class="grid">
-          <section class="card span-12 collapsible-section" id="libraryManagePanel">
+          <section class="card span-12 collapsible-section ${libraryImportExpanded ? "is-open" : ""}" id="libraryManagePanel">
             <button class="section-toggle" type="button">
               <div class="section-toggle-info">
                 <span class="section-toggle-title">词库管理</span>
-                <span class="section-toggle-desc">新建、重命名、删除词库，导入单词</span>
+                <span class="section-toggle-desc">管理词库与导入单词</span>
               </div>
               <span class="section-toggle-arrow">▾</span>
             </button>
             <div class="section-body">
-              <div class="row" style="margin-bottom:16px">
+              <div class="library-manage-toolbar">
                 <button id="newLibraryBtn">新建词库</button>
+                <h3>当前词库</h3>
+                <label>词库名称
+                  <input id="libraryNameInput" value="${escapeHtml(lib.libraryName)}">
+                </label>
+                <button class="secondary" id="renameLibraryBtn">保存名称</button>
+                <button class="danger" id="deleteLibraryBtn">删除词库</button>
+                <button class="secondary" id="toggleWordImportBtn">${libraryImportExpanded ? "收起导入" : "导入单词"}</button>
               </div>
-              <div class="row between" style="margin-bottom:14px">
-                <h3 style="margin:0">当前词库</h3>
-                <div class="row mobile-full" style="flex:1; justify-content:flex-end">
-                  <label style="min-width:260px; max-width:420px">词库名称
-                    <input id="libraryNameInput" value="${escapeHtml(lib.libraryName)}">
-                  </label>
-                  <button id="renameLibraryBtn">保存名称</button>
-                  <button class="danger" id="deleteLibraryBtn">删除词库</button>
+              <div class="library-import-panel" id="libraryImportPanel" ${libraryImportExpanded ? "" : "hidden"}>
+                <div class="library-import-heading">
+                  <h3>导入单词</h3>
+                  <span class="small muted">每行一个：英文或词组 + 中文释义；也可只填英文。</span>
                 </div>
-              </div>
-              <h3 style="margin:0 0 8px">导入单词</h3>
-              <div class="stack">
-                <div class="notice small">每行一个：英文 中文释义。系统会从第一个中文字符开始切分，中文前面的内容会完整作为英文或英文词组。只有英文也可以导入，中文释义会留空。</div>
                 <textarea id="wordImportText" placeholder="achievement 成就&#10;travel writer 旅行作家&#10;research assistant 研究员&#10;storage 储存"></textarea>
-                <div class="row mobile-full">
+                <div class="library-import-actions">
                   <button id="appendWordsBtn">追加到词库</button>
                   <button class="danger" id="replaceWordsBtn">清空并重建词库</button>
                 </div>
@@ -3131,9 +3708,19 @@
         </div>
       `;
 
-      document.getElementById("newLibraryBtn").onclick = () => {
-        const name = prompt("请输入新词库名称", "新词库");
-        if (name) createLibrary(name);
+      document.getElementById("newLibraryBtn").onclick = async () => {
+        const name = await requestNewLibraryName();
+        if (!name) return;
+        libraryImportExpanded = true;
+        createLibrary(name);
+        requestAnimationFrame(() => document.getElementById("wordImportText")?.focus());
+      };
+      document.getElementById("toggleWordImportBtn").onclick = () => {
+        libraryImportExpanded = !libraryImportExpanded;
+        const panel = document.getElementById("libraryImportPanel");
+        panel.hidden = !libraryImportExpanded;
+        document.getElementById("toggleWordImportBtn").textContent = libraryImportExpanded ? "收起导入" : "导入单词";
+        if (libraryImportExpanded) requestAnimationFrame(() => document.getElementById("wordImportText")?.focus());
       };
       document.getElementById("renameLibraryBtn").onclick = () => {
         lib.libraryName = document.getElementById("libraryNameInput").value.trim() || lib.libraryName;
@@ -3150,17 +3737,17 @@
         alert("追加完成：新增 " + result.added + " 个，跳过重复 " + result.skipped + " 个。");
         renderLibraryManager();
       };
-      document.getElementById("replaceWordsBtn").onclick = () => {
-        const first = confirm("清空并重建会删除当前词库的学习进度、每日记录和错词记录。确定继续吗？");
+      document.getElementById("replaceWordsBtn").onclick = async () => {
+        const first = await requestAppConfirmation("清空并重建会删除当前词库的学习进度、每日记录和错词记录。确定继续吗？");
         if (!first) return;
-        const second = confirm("请再次确认：该词库会从粘贴内容重新开始。");
+        const second = await requestAppConfirmation("请再次确认：该词库会从粘贴内容重新开始。");
         if (!second) return;
         const result = importWordsToLibrary(lib, document.getElementById("wordImportText").value, "replace");
         alert("重建完成：新增 " + result.added + " 个，跳过重复 " + result.skipped + " 个。");
         renderLibraryManager();
       };
-      document.getElementById("repairPhraseSplitBtn").onclick = () => {
-        const ok = confirm("将自动修复类似“travel / writer 旅行作家”的词组拆分。只会处理中文释义开头带英文片段的记录，确定继续吗？");
+      document.getElementById("repairPhraseSplitBtn").onclick = async () => {
+        const ok = await requestAppConfirmation("将自动修复类似“travel / writer 旅行作家”的词组拆分。只会处理中文释义开头带英文片段的记录，确定继续吗？");
         if (!ok) return;
         const result = repairSplitPhraseMeanings(lib);
         alert("修复完成：已修复 " + result.repaired + " 条，因重复跳过 " + result.skipped + " 条。");
@@ -3300,12 +3887,12 @@
         });
       });
       document.querySelectorAll("[data-move-position]").forEach(input => {
-        input.addEventListener("change", () => {
+        input.addEventListener("change", async () => {
           moveUnlearnedWord(lib, input.dataset.movePosition, Number(input.value || 1));
         });
       });
       document.querySelectorAll("[data-word-text-id]").forEach(input => {
-        input.addEventListener("change", () => {
+        input.addEventListener("change", async () => {
           const word = getWordById(lib, input.dataset.wordTextId);
           if (!word) return;
           const nextWordText = input.value.trim();
@@ -3320,7 +3907,7 @@
             return;
           }
           if (isWordLearnedLocked(lib, word)) {
-            const ok = confirm("这个词已经出现在历史听写记录中。修改英文只会修正显示文本，不会改变历史 Day 记录。确定继续吗？");
+            const ok = await requestAppConfirmation("这个词已经出现在历史听写记录中。修改英文只会修正显示文本，不会改变历史 Day 记录。确定继续吗？");
             if (!ok) {
               input.value = word.word;
               return;
@@ -3390,11 +3977,16 @@
         <div class="grid">
           <section class="card span-12 today-page-header">
             <div class="row between">
-              <div>
+              <div class="today-heading-block">
                 <h2>今日听写</h2>
                 <div class="small muted">${escapeHtml(lib.libraryName)} · 下一次完成后记为 Day ${dayNumber}</div>
               </div>
-              <div class="row today-page-actions">
+              <div class="today-header-controls">
+                <label class="today-date-field">本次记录日期
+                  <input id="taskDateInput" type="date" value="${escapeHtml(task?.date || todayDate())}">
+                  <span class="small muted">可手动修改</span>
+                </label>
+                ${task ? '<button class="secondary" id="exportTodayTaskBtn">导出听写纸</button>' : ''}
                 ${task ? '<button class="secondary" id="regenerateTaskBtn">按当前设置重新生成今日任务</button>' : ''}
                 <button id="buildTaskBtn">${task ? "继续今日听写" : "生成/开始今日听写"}</button>
               </div>
@@ -3481,12 +4073,6 @@
             <div>错词池：<span class="strong">${previewCounts.wrong}</span> 个。</div>
             <div>错词复查：<span class="strong">${previewCounts.review}</span> 个${previewCounts.supplement > 0 ? "（其中自动补充 " + previewCounts.supplement + " 个）" : ""}。</div>
             <div>合计：<span class="strong">${previewCounts.total}</span> 个。</div>
-            <div class="row" style="margin-top:4px">
-              <label style="max-width:220px">本次记录日期
-                <input id="taskDateInput" type="date" value="${todayDate()}">
-              </label>
-              <span class="small muted">请选择实际听写日期，不需要和上一次连续。</span>
-            </div>
             <div class="notice small">提醒：一天不超过 <span class="strong">${DAILY_MAX_WORDS}</span> 个词。</div>
             ${previewCounts.postponedReview > 0 ? '<div class="small muted">另有 ' + previewCounts.postponedReview + ' 个到期复习单词超过当天到期复查数，已顺延到后续。</div>' : ''}
             ${lib.settings.pauseNewWords ? '<div class="notice">当前已暂停新词，今日只安排错词和到期错词复查。</div>' : ''}
@@ -3527,18 +4113,12 @@
         notices.push("今天真正到期的复查数量不足，已自动补充 " + task.supplementReviewWordIds.length + " 个历史错词作为复查练习。");
       }
 
-      return `
+      const noticePanel = notices.length ? `
         <section class="card span-12">
-          <div class="task-meta-title">本次记录日期</div>
-          <div class="task-meta-controls">
-            <input id="taskDateInput" type="date" aria-label="本次记录日期" value="${escapeHtml(task.date || todayDate())}">
-            <button class="secondary" id="exportTodayTaskBtn">导出听写纸</button>
-            <span class="small muted task-meta-note">默认使用电脑日期，也可以手动改成实际听写日期。</span>
-          </div>
-          ${notices.map(text => '<div class="notice small" style="margin-top:10px">' + escapeHtml(text) + '</div>').join("")}
+          ${notices.map(text => '<div class="notice small">' + escapeHtml(text) + '</div>').join("")}
         </section>
-        ${mode === "mark" ? renderMarkWrongPanel(lib, task) : renderPlayerPanel(lib, task)}
-      `;
+      ` : "";
+      return noticePanel + (mode === "mark" ? renderMarkWrongPanel(lib, task) : renderPlayerPanel(lib, task));
     }
 
     function renderPlayerPanel(lib, task) {
@@ -3553,22 +4133,19 @@
           <div class="player">
             <div class="player-progress-area">
               <div class="progress-big">第 ${dictationIndex + 1} / ${total} 个</div>
-              <div class="word-hidden">听写过程中不显示英文和中文释义</div>
               <button id="goMarkBtn" class="player-go-mark-btn">全部播放完成，进入标记错误</button>
             </div>
             <button class="ghost player-settings-toggle" id="togglePlayerSettingsBtn" type="button">语速与声音</button>
             <div class="player-settings-block" id="playerSettingsBlock">
-              <div class="split" style="width:min(680px, 100%); text-align:left">
-                <label>语速：<span id="playerSpeechRateText">${Number(lib.settings.speechRate || 0.9).toFixed(1)}x</span>
+              <div class="split player-audio-settings">
+                <label class="player-rate-control">语速：<span id="playerSpeechRateText">${Number(lib.settings.speechRate || 0.9).toFixed(1)}x</span>
                   <input id="playerSpeechRate" type="range" min="0.5" max="1.5" step="0.1" value="${escapeHtml(lib.settings.speechRate || 0.9)}">
                 </label>
-                <label>朗读声音
-                  <select id="playerSpeechVoice" data-speech-voice-select style="width:auto">
-                    ${getSpeechVoiceOptionsHtml(lib.settings.speechVoiceName || "google-us")}
-                  </select>
-                </label>
+                <div class="voice-control">
+                  <span class="voice-control-label">朗读声音</span>
+                  ${renderSpeechVoiceButtons(lib.settings.speechVoiceName || "google-us", "player")}
+                </div>
               </div>
-              <div class="small muted">自动播放每个词播放 ${Number(lib.settings.autoPlayRepeatTimes || 1)} 次；声音不顺耳时可以临时切换。</div>
             </div>
             <div class="stack" style="width:min(680px, 100%)">
               <div class="row answer-toggle-row">
@@ -3581,8 +4158,20 @@
               <button id="playCurrentBtn">播放 / 再听一遍</button>
               <button class="ghost" id="prevWordBtn" ${dictationIndex <= 0 ? "disabled" : ""}>上一个</button>
               <button class="ghost" id="nextWordBtn">${dictationIndex >= total - 1 ? "完成播放" : "下一个"}</button>
-              <button class="secondary" id="autoPlayBtn">自动播放</button>
-              <button class="secondary" id="stopAutoBtn">停止自动播放</button>
+              <div class="auto-play-control">
+                <button class="auto-play-toggle ${autoTimer ? "is-active" : "secondary"}" id="autoPlayBtn">${autoTimer ? "自动播放中" : "自动播放"}</button>
+                <div class="auto-play-menu" id="autoPlayIntervalMenu" hidden>
+                  <div class="auto-play-choice-row interval-row">
+                    <span class="auto-play-choice-label">间隔</span>
+                    ${[3, 4, 5, 6].map(seconds => '<button class="secondary ' + (Number(lib.settings.autoPlayIntervalSeconds || 5) === seconds ? 'is-selected' : '') + '" type="button" data-auto-play-seconds="' + seconds + '">' + seconds + '秒</button>').join("")}
+                  </div>
+                  <div class="auto-play-choice-row">
+                    <span class="auto-play-choice-label">重复</span>
+                    ${[1, 2, 3, 4, 5].map(times => '<button class="secondary ' + (Number(lib.settings.autoPlayRepeatTimes || 1) === times ? 'is-selected' : '') + '" type="button" data-auto-play-repeat="' + times + '">' + times + '次</button>').join("")}
+                  </div>
+                  <button class="auto-play-menu-start" id="startAutoPlayMenuBtn" type="button">开始自动播放</button>
+                </div>
+              </div>
             </div>
             <div class="small muted">键盘左箭头：上一个并播放；右箭头：下一个并播放。</div>
           </div>
@@ -3669,9 +4258,36 @@
         }
       };
       const autoButton = document.getElementById("autoPlayBtn");
-      if (autoButton) autoButton.onclick = () => startAutoPlay();
-      const stopButton = document.getElementById("stopAutoBtn");
-      if (stopButton) stopButton.onclick = () => stopAutoPlay();
+      const autoMenu = document.getElementById("autoPlayIntervalMenu");
+      if (autoButton) {
+        autoButton.onclick = () => {
+          if (autoTimer) {
+            stopAutoPlay();
+            return;
+          }
+          if (autoMenu) autoMenu.hidden = !autoMenu.hidden;
+        };
+      }
+      document.querySelectorAll("[data-auto-play-seconds]").forEach(button => {
+        button.onclick = () => {
+          document.querySelectorAll("[data-auto-play-seconds]").forEach(item => item.classList.remove("is-selected"));
+          button.classList.add("is-selected");
+        };
+      });
+      document.querySelectorAll("[data-auto-play-repeat]").forEach(button => {
+        button.onclick = () => {
+          document.querySelectorAll("[data-auto-play-repeat]").forEach(item => item.classList.remove("is-selected"));
+          button.classList.add("is-selected");
+        };
+      });
+      const startAutoPlayMenuButton = document.getElementById("startAutoPlayMenuBtn");
+      if (startAutoPlayMenuButton) {
+        startAutoPlayMenuButton.onclick = () => {
+          const interval = Number(document.querySelector("[data-auto-play-seconds].is-selected")?.dataset.autoPlaySeconds || 5);
+          const repeat = Number(document.querySelector("[data-auto-play-repeat].is-selected")?.dataset.autoPlayRepeat || 1);
+          startAutoPlay(interval, repeat);
+        };
+      }
       const markButton = document.getElementById("goMarkBtn");
       if (markButton) markButton.onclick = () => {
         stopAutoPlay();
@@ -3696,14 +4312,14 @@
         };
         rateInput.onchange = play;
       }
-      const voiceSelect = document.getElementById("playerSpeechVoice");
-      if (voiceSelect) {
-        voiceSelect.onchange = () => {
-          lib.settings.speechVoiceName = voiceSelect.value || "google-us";
+      document.querySelectorAll('[data-speech-voice-scope="player"]').forEach(button => {
+        button.onclick = () => {
+          lib.settings.speechVoiceName = button.dataset.speechVoiceButton || "google-us";
           saveData();
+          updateSpeechVoiceButtonStates("player", lib.settings.speechVoiceName);
           play();
         };
-      }
+      });
       const revealBox = document.getElementById("answerRevealBox");
       const toggleEnglishButton = document.getElementById("toggleEnglishBtn");
       const toggleMeaningButton = document.getElementById("toggleMeaningBtn");
@@ -3736,8 +4352,8 @@
 
     function bindSubmitEvents() {
       const submitButton = document.getElementById("submitResultBtn");
-      if (submitButton) submitButton.onclick = () => {
-        const ok = confirm("确定提交今日结果吗？提交后会计入一个学习 Day。");
+      if (submitButton) submitButton.onclick = async () => {
+        const ok = await requestAppConfirmation("确定提交今日结果吗？提交后会计入一个学习 Day。");
         if (ok) submitTodayResult();
       };
       const wrongChecks = document.querySelectorAll("[data-wrong-check]");
@@ -3766,11 +4382,28 @@
       if (hint) hint.textContent = "将提交 " + selected.length + " 个错词。";
     }
 
-    function startAutoPlay() {
+    function setAutoPlayButtonState(isActive) {
+      const button = document.getElementById("autoPlayBtn");
+      const menu = document.getElementById("autoPlayIntervalMenu");
+      if (menu) menu.hidden = true;
+      if (!button) return;
+      button.textContent = isActive ? "自动播放中" : "自动播放";
+      button.className = "auto-play-toggle " + (isActive ? "is-active" : "secondary");
+    }
+
+    function startAutoPlay(intervalSeconds = null, repeatTimesValue = null) {
       const lib = getCurrentLibrary();
       const task = lib.currentDraftTask;
       if (!task) return;
       stopAutoPlay();
+      if (intervalSeconds != null) {
+        lib.settings.autoPlayIntervalSeconds = clampNumber(intervalSeconds, 3, 6, 5);
+        lib.settings.autoPlayRepeatTimes = clampNumber(repeatTimesValue, 1, 5, 1);
+        saveData();
+        if (window.cloudSync && typeof window.cloudSync.requestAutoUploadLocalData === "function") {
+          window.cloudSync.requestAutoUploadLocalData("settings-changed");
+        }
+      }
       const intervalMs = Number(lib.settings.autoPlayIntervalSeconds || 5) * 1000;
       const repeatTimes = Math.max(1, Math.min(10, Number(lib.settings.autoPlayRepeatTimes || 1)));
       const repeatGapMs = Math.max(900, Math.min(intervalMs, 1800));
@@ -3799,6 +4432,7 @@
         };
         playRepeat();
       };
+      setAutoPlayButtonState(true);
       playAndAdvance();
     }
 
@@ -3806,6 +4440,7 @@
       if (autoTimer) clearTimeout(autoTimer);
       autoTimer = null;
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      setAutoPlayButtonState(false);
     }
 
     function isTypingTarget(target) {
@@ -3947,28 +4582,22 @@
       document.getElementById("app").innerHTML = `
         <div class="grid">
           <section class="card span-12">
-            <div class="row between">
-              <div>
-                <div class="wrong-book-title-row">
+            <div class="wrong-book-header">
+              <div class="wrong-book-left">
+                <div class="wrong-book-heading">
                   <h2 style="margin-bottom:0">错词本</h2>
                   <button type="button" class="info-btn" id="wrongBookHelpBtn" style="margin-bottom:0" title="查看说明">?</button>
-                  <div class="wrong-count-summary" aria-label="错词数量统计">
-                    ${Object.entries(filterLabels).map(([key, label]) => `
-                      <button type="button" class="wrong-count-chip ${filter === key ? "active" : ""}" data-wrong-filter-chip="${key}">
-                        ${label} ${wrongCounts[key]}
-                      </button>
-                    `).join("")}
-                  </div>
+                </div>
+                <div class="wrong-count-summary" aria-label="错词数量统计">
+                  ${Object.entries(filterLabels).map(([key, label]) => `
+                    <button type="button" class="wrong-count-chip ${filter === key ? "active" : ""}" data-wrong-filter-chip="${key}">
+                      ${label} ${wrongCounts[key]}
+                    </button>
+                  `).join("")}
                 </div>
                 <div class="wrong-rule-hint">自动规则：第一轮累计错误 3 次标记为重点；到期复查时再次写错才标记为顽固。手动设置的状态优先。</div>
-                <div class="info-box" id="wrongBookHelp" style="display:none; margin-top:8px; margin-bottom:0">
-                  这里保留历史上所有曾经错过的词，和当前错词池分开管理。<br>
-                  重点词默认指第一轮累计错误达到 3 次的词；顽固词指在到期复查时再次写错的词。两种状态都可以手动调整。<br>
-                  移出错词池后，这个词不再每天强制复习，但历史错误次数仍保留。<br>
-                  如果这个词是当时误标为错误，请到 工具 → 手动校准 → 历史记录修改 中修正对应 Day 的错词勾选，系统会自动重算错误次数和错词池。
-                </div>
               </div>
-              <div class="row">
+              <div class="wrong-book-controls">
                 <label>筛选
                   <select id="wrongFilter">
                     <option value="pending">当前错词池</option>
@@ -3989,8 +4618,13 @@
                     <option value="index">按导入顺序</option>
                   </select>
                 </label>
-                <button class="secondary" id="exportWrongWordsBtn">导出当前筛选错词</button>
               </div>
+            </div>
+            <div class="info-box" id="wrongBookHelp" style="display:none; margin-top:8px; margin-bottom:0">
+              这里保留历史上所有曾经错过的词，和当前错词池分开管理。<br>
+              重点词默认指第一轮累计错误达到 3 次的词；顽固词指在到期复查时再次写错的词。两种状态都可以手动调整。<br>
+              移出错词池后，这个词不再每天强制复习，但历史错误次数仍保留。<br>
+              如果这个词是当时误标为错误，请到 工具 → 手动校准 → 历史记录修改 中修正对应 Day 的错词勾选，系统会自动重算错误次数和错词池。
             </div>
           </section>
           <section class="card span-12">
@@ -4047,6 +4681,7 @@
           <span class="wrong-bulk-count" id="wrongBulkSelectedCount">已选择 ${selectedVisibleCount} 个</span>
           <button class="secondary" id="batchAddWrongPoolBtn" type="button" ${selectedVisibleCount ? "" : "disabled"}>批量加入错词池</button>
           <button class="ghost" id="batchRemoveWrongPoolBtn" type="button" ${selectedVisibleCount ? "" : "disabled"}>批量移出错词池</button>
+          <button class="secondary" id="exportWrongWordsBtn" type="button">导出当前筛选错词</button>
         </div>
       `;
     }
@@ -4166,7 +4801,7 @@
       refreshSelectionUi();
     }
 
-    function batchUpdateWrongPool(wordIds, isPendingWrong) {
+    async function batchUpdateWrongPool(wordIds, isPendingWrong) {
       const lib = getCurrentLibrary();
       const ids = uniqueWordIds(wordIds || []);
       if (!ids.length) return;
@@ -4199,7 +4834,7 @@
         window.cloudSync.requestAutoUploadLocalData(isPendingWrong ? "wrong-pool-batch-add" : "wrong-pool-batch-remove");
       }
       if (lib.currentDraftTask) {
-        const rebuild = confirm("已更新 " + changedCount + " 个词的错词池状态。今日任务已经生成，是否按最新错词池重新生成今日任务？这不会增加 Day，也不会写入记录。");
+        const rebuild = await requestAppConfirmation("已更新 " + changedCount + " 个词的错词池状态。今日任务已经生成，是否按最新错词池重新生成今日任务？这不会增加 Day，也不会写入记录。");
         if (rebuild) {
           viewName = "today";
           renderNav();
@@ -4254,19 +4889,19 @@
             <div class="notice small">
               适合补录连续几天的真实听写结果。系统会先生成 Day 1 的完整清单，你勾当天错词；保存后自动生成 Day 2，并带入 Day 1 后仍在错词池里的词。
             </div>
-            <div class="split">
+            <div class="manual-setup-grid">
               <label>从 Day 几开始补录
                 <input id="batchStartDay" type="number" min="1" value="${getNextDayNumber(lib)}">
               </label>
               <label>连续补录几天
                 <input id="batchDays" type="number" min="1" value="3">
               </label>
+              <label>每天新词数
+                <input id="batchNewCount" type="number" min="0" placeholder="留空则自动生成">
+              </label>
+              <button id="startBatchBackfillBtn">开始连续补录</button>
             </div>
-            <label>每天新词数
-              <input id="batchNewCount" type="number" min="0" placeholder="留空则按当天新词数自动生成">
-            </label>
             <div class="small muted">如果你前三天每天就是 30 个新词，可以填 30；如果本来就按设置里的“当天新词数”走，留空即可。</div>
-            <button id="startBatchBackfillBtn">开始连续补录</button>
           </div>
         `;
         document.getElementById("startBatchBackfillBtn").onclick = startBatchManualBackfill;
@@ -4312,8 +4947,8 @@
       const saveButton = document.getElementById("saveBatchDayBtn");
       if (saveButton) saveButton.onclick = saveBatchManualDay;
       bindWrongSelectionCounter("[data-batch-wrong]", "batchWrongCountText");
-      document.getElementById("cancelBatchBtn").onclick = () => {
-        const ok = confirm("确定结束本次连续补录吗？已经保存的 Day 会保留。");
+      document.getElementById("cancelBatchBtn").onclick = async () => {
+        const ok = await requestAppConfirmation("确定结束本次连续补录吗？已经保存的 Day 会保留。");
         if (!ok) return;
         manualBatchSession = null;
         renderBatchManualTab();
@@ -4608,10 +5243,10 @@
       }
       const clearButton = document.getElementById("clearWrongHistoryBtn");
       if (clearButton) {
-        clearButton.onclick = () => {
-          const first = confirm("清空错词记录会把所有历史记录里的错词标记清空。确定继续吗？");
+        clearButton.onclick = async () => {
+          const first = await requestAppConfirmation("清空错词记录会把所有历史记录里的错词标记清空。确定继续吗？");
           if (!first) return;
-          const second = confirm("请再次确认：wrongCount、当前错词池、重点/顽固状态都会重新计算。");
+          const second = await requestAppConfirmation("请再次确认：wrongCount、当前错词池、重点/顽固状态都会重新计算。");
           if (!second) return;
           lib.dailyRecords.forEach(item => item.wrongWordIds = []);
           recalculateLibraryState(lib);
@@ -4678,26 +5313,23 @@
       const totalWords = records.reduce((sum, record) => sum + getTaskCategoryCounts(record).total, 0);
       const totalWrong = records.reduce((sum, record) => sum + new Set(record.wrongWordIds || []).size, 0);
       const learned = lib.words.filter(word => word.firstLearnDay != null).length;
-      const pending = getPendingWrongWords(lib).length;
       const accuracy = totalWords ? Math.round(((totalWords - totalWrong) / totalWords) * 100) : 0;
       document.getElementById("app").innerHTML = `
         <div class="grid">
           <section class="card span-12">
-            <h2>统计</h2>
-            <div class="small muted">按实际记录日期查看听写情况。日期默认取电脑日期，也可以在这里手动修改。</div>
-          </section>
-          <section class="card span-12">
-            <div class="stats stats-4col">
-              <div class="stat"><div class="small muted">完成次数</div><div class="num">${totalDictations}</div></div>
-              <div class="stat"><div class="small muted">累计正确率</div><div class="num">${accuracy}%</div></div>
-              <div class="stat"><div class="small muted">已学新词</div><div class="num">${learned} / ${lib.words.length}</div></div>
-              <div class="stat"><div class="small muted">当前错词池</div><div class="num">${pending}</div></div>
+            <div class="statistics-header-row">
+              <h2>统计</h2>
+              <div class="statistics-inline-stats">
+                <div class="stat"><div class="small muted">完成次数</div><div class="num">${totalDictations}</div></div>
+                <div class="stat"><div class="small muted">累计正确率</div><div class="num">${accuracy}%</div></div>
+                <div class="stat"><div class="small muted">已学新词</div><div class="num">${learned} / ${lib.words.length}</div></div>
+              </div>
             </div>
           </section>
           <section class="card span-12">
             <div class="row between">
               <h3>每日记录</h3>
-              <span class="small muted">修改日期后会立即保存，不影响 Day 顺序和错词计算。</span>
+              <span class="small muted">日期可手动修改</span>
             </div>
             ${renderStatisticsTable(lib, records)}
           </section>
@@ -5212,14 +5844,16 @@
                 <input data-setting="correctTimesToExitWrongPool" type="number" min="1" max="10" step="1" value="${escapeHtml(s.correctTimesToExitWrongPool)}">
               </label>
             </div>
-            <label class="checkbox-row" style="margin-top:2px">
-              <input data-setting="pauseNewWords" type="checkbox" ${s.pauseNewWords ? "checked" : ""}>
-              暂停新词
-            </label>
-            <label class="checkbox-row" style="margin-top:8px">
-              <input data-setting="autoFillReviewWords" type="checkbox" ${s.autoFillReviewWords ? "checked" : ""}>
-              到期复查不足时，自动补充历史错词
-            </label>
+            <div class="settings-toggle-row">
+              <label class="checkbox-row">
+                <input data-setting="pauseNewWords" type="checkbox" ${s.pauseNewWords ? "checked" : ""}>
+                暂停新词
+              </label>
+              <label class="checkbox-row">
+                <input data-setting="autoFillReviewWords" type="checkbox" ${s.autoFillReviewWords ? "checked" : ""}>
+                到期复查不足时，自动补充历史错词
+              </label>
+            </div>
           </section>
 
           <section class="card span-12 settings-only-section">
@@ -5233,22 +5867,22 @@
               </label>
               ${numberField("autoPlayIntervalSeconds", "自动播放间隔秒数", s.autoPlayIntervalSeconds, 1, 60)}
               ${numberField("autoPlayRepeatTimes", "自动播放每词次数", s.autoPlayRepeatTimes || 1, 1, 10)}
-              <label class="span-4">朗读语速：<span id="settingsSpeechRateText">${Number(s.speechRate || 0.9).toFixed(1)}x</span>
+              <label class="span-4 settings-rate-control">朗读语速：<span id="settingsSpeechRateText">${Number(s.speechRate || 0.9).toFixed(1)}x</span>
                 <input data-setting="speechRate" id="settingsSpeechRate" type="range" min="0.5" max="1.5" step="0.1" value="${escapeHtml(s.speechRate || 0.9)}">
               </label>
               <div class="settings-voice-actions">
-                <label>朗读声音
-                  <select data-setting="speechVoiceName" data-speech-voice-select>
-                    ${getSpeechVoiceOptionsHtml(s.speechVoiceName || "")}
-                  </select>
-                </label>
+                <div class="voice-control">
+                  <span class="voice-control-label">朗读声音</span>
+                  ${renderSpeechVoiceButtons(s.speechVoiceName || "google-us", "settings")}
+                  <input data-setting="speechVoiceName" id="settingsSpeechVoiceValue" type="hidden" value="${escapeHtml(getVoicePresetById(s.speechVoiceName) ? s.speechVoiceName : "google-us")}">
+                </div>
                 <button class="ghost" id="testSpeechBtn">测试朗读</button>
                 <button class="settings-save-button" id="saveSettingsBtn">保存设置</button>
               </div>
             </div>
           </section>
 
-          <section class="card span-12 collapsible-section" id="cloudSyncPanel">
+          <section class="card span-12 collapsible-section tool-compact-section" id="cloudSyncPanel">
             <button class="section-toggle" type="button">
               <div class="section-toggle-info">
                 <span class="section-toggle-title">云端同步</span>
@@ -5257,24 +5891,20 @@
               <span class="section-toggle-arrow">▾</span>
             </button>
             <div class="section-body">
-              <button class="info-btn" type="button" data-info-target="cloud-info" title="查看说明">？</button>
-              <div class="info-box" id="cloud-info" hidden>数据变更后会自动上传；切回前台或刷新页面时会自动检查云端并同步。覆盖本机数据仍需手动操作。</div>
-              <div class="stats">
-                <div class="stat"><div class="small muted">当前模式</div><div class="strong" id="cloudModeText">正在检查...</div></div>
-                <div class="stat"><div class="small muted">当前用户</div><div class="strong" id="cloudUserText">正在检查...</div></div>
-              </div>
-              <div class="row mobile-full" id="cloudLoginControls" style="margin-top:12px">
-                <label style="flex:1 1 280px">邮箱
+              <div class="cloud-account-row" id="cloudLoginControls">
+                <div class="cloud-status-item"><div class="small muted">当前模式</div><div class="strong" id="cloudModeText">正在检查...</div></div>
+                <div class="cloud-status-item"><div class="small muted">当前用户</div><div class="strong" id="cloudUserText">正在检查...</div></div>
+                <label>邮箱
                   <input id="cloudEmailInput" type="email" autocomplete="email" placeholder="请输入邮箱">
                 </label>
-                <label style="flex:1 1 280px">密码
+                <label>密码
                   <input id="cloudPasswordInput" type="password" autocomplete="current-password" placeholder="请输入密码">
                 </label>
                 <button id="cloudLoginBtn" type="button">登录</button>
                 <button class="secondary" id="cloudLogoutBtn" type="button" hidden>退出登录</button>
               </div>
-              <div class="small muted" id="cloudSyncMessage" style="margin-top:10px" aria-live="polite"></div>
-              <div class="row mobile-full" style="margin-top:12px">
+              <div class="small muted" id="cloudSyncMessage" style="margin-top:7px" aria-live="polite"></div>
+              <div class="cloud-action-row">
                 <button id="cloudUploadBtn" type="button" disabled>上传本地数据到云端</button>
                 <button class="secondary" id="cloudSummaryBtn" type="button" disabled>查看云端数据摘要</button>
                 <button class="secondary" id="cloudDiagnoseBtn" type="button" disabled>诊断本机与云端数据</button>
@@ -5302,8 +5932,6 @@
               <span class="section-toggle-arrow">▾</span>
             </button>
             <div class="section-body">
-              <button class="info-btn" type="button" data-info-target="backup-info" title="查看说明">？</button>
-              <div class="info-box" id="backup-info" hidden>导入会覆盖数据，操作前建议先导出全部数据备份。</div>
               <div class="row mobile-full">
                 <button id="statsDownloadLibraryBtn">导出当前词库</button>
                 <button class="danger" id="statsImportReplaceLibraryBtn">导入并覆盖当前词库</button>
@@ -5316,7 +5944,7 @@
             </div>
           </section>
 
-          <section class="card span-12 collapsible-section">
+          <section class="card span-12 collapsible-section tool-compact-section" id="manualCalibrationPanel">
             <button class="section-toggle" type="button">
               <div class="section-toggle-info">
                 <span class="section-toggle-title">手动校准</span>
@@ -5325,16 +5953,14 @@
               <span class="section-toggle-arrow">▾</span>
             </button>
             <div class="section-body">
-              <button class="info-btn" type="button" data-info-target="manual-info" title="查看说明">？</button>
-              <div class="info-box" id="manual-info" hidden>适用于补录已在线下完成的听写、修正历史记录、维护错词池。日常听写不需要使用。</div>
-              <div class="tabs">
+              <div class="tabs manual-tabs">
                 <button class="secondary" data-manual-tab="batch">连续按天补录</button>
                 <button class="secondary" data-manual-tab="strict">高级：指定新词补录</button>
                 <button class="secondary" data-manual-tab="quick">快速校准已学进度</button>
                 <button class="secondary" data-manual-tab="pool">手动维护错词池</button>
                 <button class="secondary" data-manual-tab="history">历史记录修改</button>
               </div>
-              <div id="manualContent" style="margin-top:12px"></div>
+              <div id="manualContent"></div>
             </div>
           </section>
 
@@ -5379,6 +6005,13 @@
         return;
       }
       app.querySelectorAll(".collapsible-section").forEach(section => section.remove());
+      const settingsVoiceValue = document.getElementById("settingsSpeechVoiceValue");
+      document.querySelectorAll('[data-speech-voice-scope="settings"]').forEach(button => {
+        button.onclick = () => {
+          if (settingsVoiceValue) settingsVoiceValue.value = button.dataset.speechVoiceButton || "google-us";
+          updateSpeechVoiceButtonStates("settings", settingsVoiceValue?.value || "google-us");
+        };
+      });
       document.getElementById("saveSettingsBtn").onclick = () => {
         const updates = {};
         document.querySelectorAll("[data-setting]").forEach(input => {
@@ -5397,7 +6030,12 @@
         updateLibrarySettings(updates);
         alert("设置已保存。");
       };
-      document.getElementById("testSpeechBtn").onclick = () => speakWord("achievement");
+      document.getElementById("testSpeechBtn").onclick = () => {
+        const previousVoice = lib.settings.speechVoiceName;
+        lib.settings.speechVoiceName = settingsVoiceValue?.value || "google-us";
+        speakWord("achievement");
+        lib.settings.speechVoiceName = previousVoice;
+      };
       const settingsRate = document.getElementById("settingsSpeechRate");
       const settingsRateText = document.getElementById("settingsSpeechRateText");
       if (settingsRate && settingsRateText) {
