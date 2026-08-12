@@ -391,8 +391,10 @@ function formatUploadResult(result) {
 }
 
 async function uploadLocalData(elements) {
-  const confirmed = window.confirm(
-    "上传前请先导出本地 JSON 备份。本操作会把当前浏览器里的词库、单词、听写记录、错词进度上传到当前登录的云端账号。不会清空本地数据，也不会从云端下载覆盖本机数据。确定继续吗？"
+  const confirmUpload = window.requestAppConfirmation || (message => Promise.resolve(window.confirm(message)));
+  const confirmed = await confirmUpload(
+    "上传前请先导出本地 JSON 备份。本操作会把当前浏览器里的词库、单词、听写记录、错词进度上传到当前登录的云端账号。不会清空本地数据，也不会从云端下载覆盖本机数据。确定继续吗？",
+    "上传本地数据"
   );
   if (!confirmed) return;
 
@@ -472,8 +474,10 @@ function formatRestoreResult(result) {
 }
 
 async function downloadCloudData(elements) {
-  const confirmed = window.confirm(
-    "请先在当前设备导出本地 JSON 备份。本操作会把云端数据下载到当前浏览器，并覆盖当前浏览器 localStorage。不会删除云端数据。确定继续吗？"
+  const confirmDownload = window.requestAppConfirmation || (message => Promise.resolve(window.confirm(message)));
+  const confirmed = await confirmDownload(
+    "请先在当前设备导出本地 JSON 备份。本操作会把云端数据下载到当前浏览器，并覆盖当前浏览器 localStorage。不会删除云端数据。确定继续吗？",
+    "从云端恢复数据"
   );
   if (!confirmed) return;
 
