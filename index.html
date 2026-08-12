@@ -1220,6 +1220,32 @@
       font-size: 12px;
     }
 
+    .wrong-bulk-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border: 1px solid #d4ecea;
+      border-radius: 8px;
+      background: #f1faf9;
+    }
+
+    .wrong-bulk-toolbar .checkbox-row {
+      margin-right: auto;
+      white-space: nowrap;
+    }
+
+    .wrong-bulk-count {
+      min-width: 86px;
+      color: var(--color-primary-dark);
+      font-weight: 700;
+    }
+
+    .wrong-select-cell { width: 52px; text-align: center; }
+    .wrong-select-cell input { width: 20px; height: 20px; min-height: 20px; }
+
     .table-wrap {
       border-radius: 8px;
       border-color: var(--color-border);
@@ -1331,6 +1357,10 @@
       .wrong-book-title-row { align-items: flex-start; }
       .wrong-count-summary { width: 100%; }
       .wrong-count-chip { flex: 1 1 calc(50% - 6px); }
+      .wrong-bulk-toolbar { align-items: stretch; }
+      .wrong-bulk-toolbar .checkbox-row { width: 100%; margin-right: 0; }
+      .wrong-bulk-toolbar button { flex: 1 1 calc(50% - 6px); }
+      .wrong-bulk-count { display: flex; align-items: center; }
     }
   </style>
 </head>
@@ -1362,6 +1392,7 @@
       new: "新词",
       wrong: "错词复习",
       review: "到期错词复查",
+      supplement: "补充错词复查",
       multi: "多重来源"
     };
     const RECOMMENDED_VOICE_PRESETS = [
@@ -1385,6 +1416,7 @@
       dailyTargetWords: 30,
       dailyReviewWords: 30,
       countMode: "split-new-review",
+      autoFillReviewWords: true,
       pauseNewWords: false,
       playOrder: "ordered",
       autoPlayIntervalSeconds: 5,
@@ -1418,6 +1450,7 @@
     let manualBatchSession = null;
     let editingRecordDay = null;
     let availableSpeechVoices = [];
+    let selectedWrongBookWordIds = new Set();
 
     function uid(prefix) {
       return prefix + "_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
@@ -1513,6 +1546,8 @@
         isStubborn: false,
         manualFocus: null,
         manualStubborn: null,
+        hasWrongReviewFailure: false,
+        manualReviewPracticePending: false,
         skipDelayedReviewSchedule: false
       };
     }
@@ -1730,6 +1765,17 @@
       lib.words = Array.isArray(lib.words) ? lib.words : [];
       lib.dailyRecords = Array.isArray(lib.dailyRecords) ? lib.dailyRecords : [];
       lib.currentDraftTask = lib.currentDraftTask || null;
+      const wrongReviewFailureIds = new Set();
+      lib.dailyRecords.forEach(record => {
+        const reviewIds = new Set([
+          ...(record.delayedReviewWordIds || []),
+          ...(record.wrongReviewWordIds || []),
+          ...(record.supplementReviewWordIds || [])
+        ]);
+        (record.wrongWordIds || []).forEach(id => {
+          if (reviewIds.has(id)) wrongReviewFailureIds.add(id);
+        });
+      });
       lib.words.forEach((word, index) => {
         const normalized = normalizeWord(word.word || word.id);
         word.id = word.id || normalized || uid("word");
@@ -1752,6 +1798,8 @@
         word.correctStreakInWrongPool = Number(word.correctStreakInWrongPool || 0);
         word.manualFocus = word.manualFocus ?? null;
         word.manualStubborn = word.manualStubborn ?? null;
+        word.hasWrongReviewFailure = Boolean(word.hasWrongReviewFailure || wrongReviewFailureIds.has(word.id));
+        word.manualReviewPracticePending = Boolean(word.manualReviewPracticePending);
         word.skipDelayedReviewSchedule = Boolean(word.skipDelayedReviewSchedule);
         applyWrongFlags(word);
       });
@@ -1765,6 +1813,25 @@
         recalculateLibraryState(lib, { preserveDraft: options.preserveDraft !== false, silent: true });
       }
       lib.reviewRuleVersion = "wrong-only-review-v1";
+      if (lib.wrongClassificationVersion !== "review-failure-stubborn-v2") {
+        recalculateWrongClassificationsFromHistory(lib);
+        lib.wrongClassificationVersion = "review-failure-stubborn-v2";
+      }
+    }
+
+    function recalculateWrongClassificationsFromHistory(lib) {
+      if (!lib?.dailyRecords?.length) {
+        lib.words.forEach(word => applyWrongFlags(word));
+        return;
+      }
+      const replayLibrary = clone(lib);
+      recalculateLibraryState(replayLibrary, { preserveDraft: true, silent: true });
+      const replayById = new Map(replayLibrary.words.map(word => [word.id, word]));
+      lib.words.forEach(word => {
+        const replayWord = replayById.get(word.id);
+        word.hasWrongReviewFailure = Boolean(replayWord?.hasWrongReviewFailure);
+        applyWrongFlags(word);
+      });
     }
 
     function ensureOriginalNos(lib) {
@@ -2009,10 +2076,52 @@
         });
     }
 
-    function applyDailyLimit(pendingWrongWords, dueReviewWords, unlearnedWords, plannedNewCount, settings) {
+    function getLastReviewPracticeDay(lib, wordId) {
+      return (lib.dailyRecords || []).reduce((latestDay, record) => {
+        const reviewIds = [
+          ...(record.delayedReviewWordIds || []),
+          ...(record.wrongReviewWordIds || []),
+          ...(record.supplementReviewWordIds || [])
+        ];
+        return reviewIds.includes(wordId)
+          ? Math.max(latestDay, Number(record.dayNumber || 0))
+          : latestDay;
+      }, 0);
+    }
+
+    function getSupplementReviewWords(dayNumber, lib = getCurrentLibrary(), excludedIds = []) {
+      if (!lib?.settings?.autoFillReviewWords) return [];
+      const excluded = new Set(excludedIds);
+      const reviewCooldownDays = Math.max(1, Number(lib.settings.reviewDelayDays || 15));
+      return lib.words
+        .filter(word => {
+          const lastReviewDay = getLastReviewPracticeDay(lib, word.id);
+          return word.firstLearnDay != null
+            && Number(word.wrongCount || 0) > 0
+            && !word.isPendingWrong
+            && !excluded.has(word.id)
+            && (!lastReviewDay || Number(dayNumber) - lastReviewDay >= reviewCooldownDays);
+        })
+        .sort((a, b) => {
+          const aDue = getWrongReviewDueDay(a);
+          const bDue = getWrongReviewDueDay(b);
+          const aScheduled = aDue != null;
+          const bScheduled = bDue != null;
+          if (aScheduled !== bScheduled) return aScheduled ? -1 : 1;
+          if (aScheduled && aDue !== bDue) return aDue - bDue;
+          const reviewDayOrder = getLastReviewPracticeDay(lib, a.id) - getLastReviewPracticeDay(lib, b.id);
+          if (reviewDayOrder) return reviewDayOrder;
+          const wrongDayOrder = Number(a.lastWrongDay || 0) - Number(b.lastWrongDay || 0);
+          if (wrongDayOrder) return wrongDayOrder;
+          return a.index - b.index;
+        });
+    }
+
+    function applyDailyLimit(pendingWrongWords, dueReviewWords, unlearnedWords, plannedNewCount, settings, supplementReviewWords = []) {
       const selectedWrongIds = uniqueWordIds(pendingWrongWords.map(word => word.id));
       const selectedIdSet = new Set(selectedWrongIds);
       const selectedReviewIds = [];
+      const selectedSupplementReviewIds = [];
       const postponedReviewIds = [];
       const reviewLimit = clampNumber(settings.dailyReviewWords, 0, 100, 30);
       let selectedStandaloneReviewCount = 0;
@@ -2031,6 +2140,20 @@
         }
       });
 
+      supplementReviewWords.forEach(word => {
+        if (selectedStandaloneReviewCount >= reviewLimit || selectedIdSet.has(word.id)) return;
+        selectedReviewIds.push(word.id);
+        selectedSupplementReviewIds.push(word.id);
+        selectedIdSet.add(word.id);
+        selectedStandaloneReviewCount += 1;
+      });
+
+      pendingWrongWords.forEach(word => {
+        if (word.manualReviewPracticePending && !selectedReviewIds.includes(word.id)) {
+          selectedReviewIds.push(word.id);
+        }
+      });
+
       const newWordIds = [];
       const newLimit = clampNumber(plannedNewCount, 0, 100, 30);
       for (const word of unlearnedWords) {
@@ -2043,6 +2166,7 @@
       return {
         pendingWrongWordIds: selectedWrongIds,
         delayedReviewWordIds: uniqueWordIds(selectedReviewIds),
+        supplementReviewWordIds: uniqueWordIds(selectedSupplementReviewIds),
         postponedReviewWordIds: uniqueWordIds(postponedReviewIds),
         newWordIds,
         plannedNewCount,
@@ -2059,8 +2183,19 @@
       const plannedNewCount = getPlannedNewWordCount(dayNumber, lib);
       const pendingWrongWords = getPendingWrongWords(lib);
       const dueReviewWords = getDueDelayedReviewWords(dayNumber, lib);
+      const supplementReviewWords = getSupplementReviewWords(dayNumber, lib, [
+        ...pendingWrongWords.map(word => word.id),
+        ...dueReviewWords.map(word => word.id)
+      ]);
       const unlearnedWords = getUnlearnedWords(lib);
-      const limited = applyDailyLimit(pendingWrongWords, dueReviewWords, unlearnedWords, plannedNewCount, lib.settings);
+      const limited = applyDailyLimit(
+        pendingWrongWords,
+        dueReviewWords,
+        unlearnedWords,
+        plannedNewCount,
+        lib.settings,
+        supplementReviewWords
+      );
       const sourceMap = {};
 
       function addSource(ids, source) {
@@ -2070,8 +2205,10 @@
         });
       }
 
+      const supplementSet = new Set(limited.supplementReviewWordIds || []);
       addSource(limited.pendingWrongWordIds, "wrong");
-      addSource(limited.delayedReviewWordIds, "review");
+      addSource(limited.delayedReviewWordIds.filter(id => !supplementSet.has(id)), "review");
+      addSource(limited.supplementReviewWordIds || [], "supplement");
       addSource(limited.newWordIds, "new");
 
       let taskWordIds = Array.from(new Set([
@@ -2092,6 +2229,7 @@
         newWordIds: limited.newWordIds,
         pendingWrongWordIds: limited.pendingWrongWordIds,
         delayedReviewWordIds: limited.delayedReviewWordIds,
+        supplementReviewWordIds: limited.supplementReviewWordIds,
         postponedReviewWordIds: limited.postponedReviewWordIds,
         plannedNewCount: limited.plannedNewCount,
         actualNewCount: limited.actualNewCount,
@@ -2107,8 +2245,19 @@
       const plannedNewCount = getPlannedNewWordCount(dayNumber, lib);
       const pendingWrongWords = getPendingWrongWords(lib);
       const dueReviewWords = getDueDelayedReviewWords(dayNumber, lib);
+      const supplementReviewWords = getSupplementReviewWords(dayNumber, lib, [
+        ...pendingWrongWords.map(word => word.id),
+        ...dueReviewWords.map(word => word.id)
+      ]);
       const unlearnedWords = getUnlearnedWords(lib);
-      const limited = applyDailyLimit(pendingWrongWords, dueReviewWords, unlearnedWords, plannedNewCount, lib.settings);
+      const limited = applyDailyLimit(
+        pendingWrongWords,
+        dueReviewWords,
+        unlearnedWords,
+        plannedNewCount,
+        lib.settings,
+        supplementReviewWords
+      );
       const taskSet = new Set(uniqueWordIds([
         ...limited.pendingWrongWordIds,
         ...limited.delayedReviewWordIds,
@@ -2121,6 +2270,7 @@
         new: newSet.size,
         wrong: wrongSet.size,
         review: reviewSet.size,
+        supplement: uniqueWordIds(limited.supplementReviewWordIds || []).filter(id => reviewSet.has(id) || wrongSet.has(id)).length,
         total: taskSet.size,
         postponedReview: uniqueWordIds(limited.postponedReviewWordIds).length
       };
@@ -2261,11 +2411,13 @@
       renderTodayView("player");
     }
 
-    function regenerateTodayTaskFromSettings() {
+    function regenerateTodayTaskFromSettings(options = {}) {
       const lib = getCurrentLibrary();
       if (!lib || !lib.currentDraftTask) return;
-      const ok = confirm("确定要按当前设置重新生成今日任务吗？这不会增加 Day，也不会写入记录。");
-      if (!ok) return;
+      if (!options.skipConfirm) {
+        const ok = confirm("确定要按当前设置重新生成今日任务吗？这不会增加 Day，也不会写入记录。");
+        if (!ok) return;
+      }
       const taskDate = lib.currentDraftTask.date || todayDate();
       stopAutoPlay();
       lib.currentDraftTask = null;
@@ -2340,6 +2492,7 @@
         newWordIds: uniqueWordIds(task.newWordIds),
         pendingWrongWordIds: uniqueWordIds(task.pendingWrongWordIds),
         delayedReviewWordIds: uniqueWordIds(task.delayedReviewWordIds),
+        supplementReviewWordIds: uniqueWordIds(task.supplementReviewWordIds || []),
         postponedReviewWordIds: uniqueWordIds(task.postponedReviewWordIds),
         wrongWordIds: uniqueWordIds(wrongWordIds),
         completedAt: nowIso(),
@@ -2378,8 +2531,13 @@
 
     function updateWordStatsFromRecord(lib, record) {
       const wrongSet = new Set(record.wrongWordIds || []);
-      const delayedSet = new Set(record.delayedReviewWordIds || []);
+      const delayedSet = new Set([
+        ...(record.delayedReviewWordIds || []),
+        ...(record.wrongReviewWordIds || []),
+        ...(record.supplementReviewWordIds || [])
+      ]);
       const newSet = new Set(record.newWordIds || []);
+      const recordedPendingSet = new Set(record.pendingWrongWordIds || []);
       const recordDate = getRecordDate(record);
       const pendingBefore = new Set(lib.words.filter(word => word.isPendingWrong).map(word => word.id));
       const movedOut = [];
@@ -2404,12 +2562,20 @@
         const word = getWordById(lib, id);
         if (!word) return;
         const wasWrong = wrongSet.has(id);
+        const scheduledReviewBeforeRecord = getWrongReviewDueDay(word) != null;
+        const inferredManualReview = !delayedSet.has(id)
+          && recordedPendingSet.has(id)
+          && !pendingBefore.has(id)
+          && scheduledReviewBeforeRecord;
+        const isReviewAttempt = delayedSet.has(id) || inferredManualReview;
         if (wasWrong) {
+          if (isReviewAttempt) word.hasWrongReviewFailure = true;
           word.wrongCount = Number(word.wrongCount || 0) + 1;
           word.lastWrongDay = Number(record.dayNumber);
           word.lastWrongDate = recordDate;
           word.isPendingWrong = true;
           word.correctStreakInWrongPool = 0;
+          word.manualReviewPracticePending = false;
           clearWrongReview(word, 0);
           // Fix R2：quickCalibrateProgress/addManualRecord 里勾选“跳过延迟复查”时会在 record 上
           // 打 skipDelayedReviewSchedule 标记，这里把它落到 word 上，等这个词以后真正移出错词池、
@@ -2423,7 +2589,9 @@
             word.isPendingWrong = false;
             word.correctStreakInWrongPool = 0;
             word.lastExitedWrongPoolDay = Number(record.dayNumber);
-            if (word.skipDelayedReviewSchedule) {
+            if (isReviewAttempt) {
+              completeWrongReviewSuccess(word, record.dayNumber, lib);
+            } else if (word.skipDelayedReviewSchedule) {
               clearWrongReview(word, 0);
               word.skipDelayedReviewSchedule = false;
             } else {
@@ -2431,13 +2599,9 @@
             }
             movedOut.push(id);
           }
-        } else if (delayedSet.has(id)) {
-          const completedCount = Number(word.wrongReviewCompletedCount || 0) + 1;
-          if (Number(word.wrongCount || 0) >= 2 && completedCount < 2) {
-            scheduleWrongReview(word, record.dayNumber, lib, completedCount);
-          } else {
-            clearWrongReview(word, completedCount);
-          }
+        } else if (isReviewAttempt) {
+          completeWrongReviewSuccess(word, record.dayNumber, lib);
+          if (recordedPendingSet.has(id)) movedOut.push(id);
         }
         applyWrongFlags(word);
       });
@@ -2466,13 +2630,26 @@
       };
     }
 
+    function completeWrongReviewSuccess(word, dayNumber, lib) {
+      const completedCount = Number(word.wrongReviewCompletedCount || 0) + 1;
+      word.manualReviewPracticePending = false;
+      if (Number(word.wrongCount || 0) >= 2 && completedCount < 2) {
+        scheduleWrongReview(word, dayNumber, lib, completedCount);
+      } else {
+        clearWrongReview(word, completedCount);
+      }
+    }
+
     function applyWrongFlags(word) {
-      word.isFocus = word.manualFocus === null || word.manualFocus === undefined
-        ? Number(word.wrongCount || 0) >= 2
-        : Boolean(word.manualFocus);
+      const automaticStubborn = Boolean(word.hasWrongReviewFailure);
+      const automaticFocus = Number(word.wrongCount || 0) >= 3;
       word.isStubborn = word.manualStubborn === null || word.manualStubborn === undefined
-        ? Number(word.wrongCount || 0) >= 3
+        ? automaticStubborn
         : Boolean(word.manualStubborn);
+      const focusResult = word.manualFocus === null || word.manualFocus === undefined
+        ? automaticFocus
+        : Boolean(word.manualFocus);
+      word.isFocus = !word.isStubborn && focusResult;
     }
 
     function recalculateLibraryState(lib = getCurrentLibrary(), options = {}) {
@@ -2509,6 +2686,7 @@
         "newWordIds",
         "pendingWrongWordIds",
         "delayedReviewWordIds",
+        "supplementReviewWordIds",
         "postponedReviewWordIds",
         "wrongWordIds"
       ].forEach(key => {
@@ -2738,7 +2916,16 @@
       const lib = getCurrentLibrary();
       const word = getWordById(lib, wordId);
       if (!word) return;
-      if ("isPendingWrong" in updates) word.isPendingWrong = Boolean(updates.isPendingWrong);
+      const previousScrollTop = window.scrollY;
+      if ("isPendingWrong" in updates) {
+        const nextPending = Boolean(updates.isPendingWrong);
+        if (nextPending && !word.isPendingWrong && getWrongReviewDueDay(word) != null) {
+          word.manualReviewPracticePending = true;
+        } else if (!nextPending) {
+          word.manualReviewPracticePending = false;
+        }
+        word.isPendingWrong = nextPending;
+      }
       if ("wrongCount" in updates) {
         word.wrongCount = Math.max(0, Number(updates.wrongCount || 0));
         if (word.wrongCount > 0 && !word.lastWrongDate) word.lastWrongDate = todayDate();
@@ -2754,6 +2941,7 @@
       lib.updatedAt = new Date().toISOString();
       saveData();
       renderApp();
+      requestAnimationFrame(() => window.scrollTo(0, previousScrollTop));
       if (window.cloudSync && typeof window.cloudSync.requestAutoUploadLocalData === "function") {
         window.cloudSync.requestAutoUploadLocalData("pool-updated");
       }
@@ -2824,7 +3012,7 @@
       const list = Array.isArray(sources) ? sources : [sources];
       if (list.length > 1) return '<span class="tag multi">多重来源</span>';
       const source = list[0] || "new";
-      const cls = source === "wrong" ? "wrong" : source === "review" ? "review" : "new";
+      const cls = source === "wrong" ? "wrong" : ["review", "supplement"].includes(source) ? "review" : "new";
       return '<span class="tag ' + cls + '">' + SOURCE_LABELS[source] + '</span>';
     }
 
@@ -3220,7 +3408,7 @@
                 <div class="stat"><div class="small muted">今日总词数</div><div class="num">${categoryCounts.total}</div></div>
                 <div class="stat"><div class="small muted">今日新词</div><div class="num">${categoryCounts.new}</div></div>
                 <div class="stat"><div class="small muted">今日错词复习</div><div class="num">${categoryCounts.wrong}</div></div>
-                <div class="stat"><div class="small muted">今日到期复查</div><div class="num">${categoryCounts.review}</div></div>
+                <div class="stat"><div class="small muted">今日错词复查</div><div class="num">${categoryCounts.review}</div></div>
               </div>
               <div class="today-divider"></div>
               <div class="today-secondary-stats">
@@ -3231,7 +3419,7 @@
             </div>
             <div class="today-mobile-summary">
               <strong>今日 ${categoryCounts.total} 个</strong>
-              <span>新词 ${categoryCounts.new} · 错词复习 ${categoryCounts.wrong}${categoryCounts.review > 0 ? " · 到期复查 " + categoryCounts.review : ""}</span>
+              <span>新词 ${categoryCounts.new} · 错词复习 ${categoryCounts.wrong}${categoryCounts.review > 0 ? " · 错词复查 " + categoryCounts.review : ""}</span>
               <small>Day ${dayNumber} · 已学 ${learned} / ${lib.words.length} · 错词池 ${pendingCount}</small>
             </div>
           </section>
@@ -3291,7 +3479,7 @@
             <div class="notice small">点击开始后会生成今日任务。任务生成后会保留在浏览器中，只有提交错词结果才算完成这一天。</div>
             <div>新单词：<span class="strong">${previewCounts.new}</span> 个。</div>
             <div>错词池：<span class="strong">${previewCounts.wrong}</span> 个。</div>
-            <div>到期复习单词：<span class="strong">${previewCounts.review}</span> 个。</div>
+            <div>错词复查：<span class="strong">${previewCounts.review}</span> 个${previewCounts.supplement > 0 ? "（其中自动补充 " + previewCounts.supplement + " 个）" : ""}。</div>
             <div>合计：<span class="strong">${previewCounts.total}</span> 个。</div>
             <div class="row" style="margin-top:4px">
               <label style="max-width:220px">本次记录日期
@@ -3323,7 +3511,7 @@
 
     function renderTaskCountSummary(counts) {
       const parts = ["新词 " + counts.new, "错词复习 " + counts.wrong];
-      if (counts.review > 0) parts.push("到期错词复查 " + counts.review);
+      if (counts.review > 0) parts.push("错词复查 " + counts.review);
       return "今日 " + counts.total + " 个：" + parts.join(" + ");
     }
 
@@ -3331,9 +3519,12 @@
       const categoryCounts = getTaskCategoryCounts(task);
       const dueActual = categoryCounts.review;
       const notices = [];
-      if (lib.settings.pauseNewWords) notices.push("当前已暂停新词，今日只安排错词和到期错词复查。");
+      if (lib.settings.pauseNewWords) notices.push("当前已暂停新词，今日只安排错词复习和错词复查。");
       if (task.postponedReviewWordIds.length) {
         notices.push("有 " + task.postponedReviewWordIds.length + " 个到期错词复查超过当天到期复查数，已顺延到后续。");
+      }
+      if ((task.supplementReviewWordIds || []).length) {
+        notices.push("今天真正到期的复查数量不足，已自动补充 " + task.supplementReviewWordIds.length + " 个历史错词作为复查练习。");
       }
 
       return `
@@ -3725,23 +3916,31 @@
       const wrongCounts = {
         pending: allWrongWords.filter(word => word.isPendingWrong).length,
         all: allWrongWords.length,
+        scheduled: allWrongWords.filter(word => !word.isPendingWrong && getWrongReviewDueDay(word) != null).length,
+        due: allWrongWords.filter(word => !word.isPendingWrong && isWrongReviewDue(word, lib)).length,
         focus: allWrongWords.filter(word => word.isFocus).length,
         stubborn: allWrongWords.filter(word => word.isStubborn).length
       };
       const filterLabels = {
         pending: "当前错词池",
         all: "全部错词",
+        scheduled: "待复查错词",
+        due: "今日已到期",
         focus: "重点错词",
         stubborn: "顽固错词"
       };
       let words = allWrongWords.slice();
       if (filter === "pending") words = words.filter(word => word.isPendingWrong);
+      if (filter === "scheduled") words = words.filter(word => !word.isPendingWrong && getWrongReviewDueDay(word) != null);
+      if (filter === "due") words = words.filter(word => !word.isPendingWrong && isWrongReviewDue(word, lib));
       if (filter === "focus") words = words.filter(word => word.isFocus);
       if (filter === "stubborn") words = words.filter(word => word.isStubborn);
       words.sort((a, b) => {
         if (sort === "word") return String(a.word || "").localeCompare(String(b.word || ""));
         if (sort === "index") return a.index - b.index;
         if (sort === "first") return (a.firstLearnDay || 999999) - (b.firstLearnDay || 999999);
+        if (sort === "review") return (getWrongReviewDueDay(a) ?? 999999) - (getWrongReviewDueDay(b) ?? 999999);
+        if (sort === "date") return String(b.lastWrongDate || "").localeCompare(String(a.lastWrongDate || ""));
         return (b.wrongCount || 0) - (a.wrongCount || 0);
       });
 
@@ -3761,10 +3960,10 @@
                     `).join("")}
                   </div>
                 </div>
-                <div class="wrong-rule-hint">自动规则：累计错误 2 次标记为重点，3 次标记为顽固；手动设置的状态优先。</div>
+                <div class="wrong-rule-hint">自动规则：第一轮累计错误 3 次标记为重点；到期复查时再次写错才标记为顽固。手动设置的状态优先。</div>
                 <div class="info-box" id="wrongBookHelp" style="display:none; margin-top:8px; margin-bottom:0">
                   这里保留历史上所有曾经错过的词，和当前错词池分开管理。<br>
-                  重点词默认指累计错误达到 2 次的词；顽固词默认指累计错误达到 3 次的词。两种状态都可以手动调整。<br>
+                  重点词默认指第一轮累计错误达到 3 次的词；顽固词指在到期复查时再次写错的词。两种状态都可以手动调整。<br>
                   移出错词池后，这个词不再每天强制复习，但历史错误次数仍保留。<br>
                   如果这个词是当时误标为错误，请到 工具 → 手动校准 → 历史记录修改 中修正对应 Day 的错词勾选，系统会自动重算错误次数和错词池。
                 </div>
@@ -3774,6 +3973,8 @@
                   <select id="wrongFilter">
                     <option value="pending">当前错词池</option>
                     <option value="all">全部错词</option>
+                    <option value="scheduled">待复查错词</option>
+                    <option value="due">今日已到期</option>
                     <option value="focus">重点错词</option>
                     <option value="stubborn">顽固错词</option>
                   </select>
@@ -3781,6 +3982,8 @@
                 <label>排序
                   <select id="wrongSort">
                     <option value="count">按错误次数从高到低</option>
+                    <option value="review">按复查 Day 从近到远</option>
+                    <option value="date">按最近错误日期从近到远</option>
                     <option value="first">按第一次学习 Day</option>
                     <option value="word">按英文</option>
                     <option value="index">按导入顺序</option>
@@ -3791,16 +3994,21 @@
             </div>
           </section>
           <section class="card span-12">
+            ${renderWrongBulkToolbar(words)}
             ${renderWrongTable(lib, words)}
           </section>
         </div>
       `;
       document.getElementById("wrongFilter").value = filter;
       document.getElementById("wrongSort").value = sort;
-      document.getElementById("wrongFilter").onchange = renderWrongBook;
+      document.getElementById("wrongFilter").onchange = () => {
+        selectedWrongBookWordIds.clear();
+        renderWrongBook();
+      };
       document.getElementById("wrongSort").onchange = renderWrongBook;
       document.querySelectorAll("[data-wrong-filter-chip]").forEach(button => {
         button.onclick = () => {
+          selectedWrongBookWordIds.clear();
           const select = document.getElementById("wrongFilter");
           if (select) select.value = button.dataset.wrongFilterChip;
           renderWrongBook();
@@ -3811,10 +4019,36 @@
         if (box) box.style.display = box.style.display === "none" ? "" : "none";
       };
       document.getElementById("exportWrongWordsBtn").onclick = () => {
-        const exportLabels = { all: "全部", pending: "当前错词池", focus: "重点", stubborn: "顽固" };
+        const exportLabels = { all: "全部", pending: "当前错词池", scheduled: "待复查", due: "今日到期", focus: "重点", stubborn: "顽固" };
         exportWrongWordsToCsv(lib, words, exportLabels[filter] || "错词");
       };
-      bindWrongActions();
+      bindWrongActions(words);
+    }
+
+    function getWrongReviewDueDay(word) {
+      const dueDay = word?.wrongReviewDueDay ?? word?.delayedReviewDay;
+      return dueDay == null || !Number.isFinite(Number(dueDay)) ? null : Number(dueDay);
+    }
+
+    function isWrongReviewDue(word, lib) {
+      const dueDay = getWrongReviewDueDay(word);
+      return dueDay != null && dueDay <= getNextDayNumber(lib);
+    }
+
+    function renderWrongBulkToolbar(words) {
+      const visibleIds = new Set(words.map(word => word.id));
+      const selectedVisibleCount = Array.from(selectedWrongBookWordIds).filter(id => visibleIds.has(id)).length;
+      return `
+        <div class="wrong-bulk-toolbar">
+          <label class="checkbox-row">
+            <input id="selectAllFilteredWrong" type="checkbox">
+            全选当前筛选结果（${words.length}）
+          </label>
+          <span class="wrong-bulk-count" id="wrongBulkSelectedCount">已选择 ${selectedVisibleCount} 个</span>
+          <button class="secondary" id="batchAddWrongPoolBtn" type="button" ${selectedVisibleCount ? "" : "disabled"}>批量加入错词池</button>
+          <button class="ghost" id="batchRemoveWrongPoolBtn" type="button" ${selectedVisibleCount ? "" : "disabled"}>批量移出错词池</button>
+        </div>
+      `;
     }
 
     function renderWrongTable(lib, words) {
@@ -3824,6 +4058,7 @@
           <table>
             <thead>
               <tr>
+                <th class="wrong-select-cell">选择</th>
                 <th>英文</th>
                 <th>中文释义</th>
                 <th>错误次数</th>
@@ -3836,6 +4071,7 @@
             <tbody>
               ${words.map(word => `
                 <tr>
+                  <td data-label="选择" class="wrong-select-cell"><input type="checkbox" data-wrong-book-select="${escapeHtml(word.id)}" ${selectedWrongBookWordIds.has(word.id) ? "checked" : ""}></td>
                   <td data-label="英文" class="word-cell">${escapeHtml(word.word)}</td>
                   <td data-label="中文释义">${escapeHtml(word.meaning || "")}</td>
                   <td data-label="错误次数"><input style="width:80px" type="number" min="0" data-wrong-count="${escapeHtml(word.id)}" value="${word.wrongCount}"></td>
@@ -3866,11 +4102,52 @@
       const dueDay = word.wrongReviewDueDay ?? word.delayedReviewDay;
       if (dueDay == null) return word.delayedReviewCompleted ? '<span class="tag ok">已完成</span>' : '<span class="tag">未安排</span>';
       if (word.delayedReviewPostponed) return '<span class="tag review">已顺延到期</span>';
-      return '<span class="tag review">Day ' + dueDay + '</span>';
+      const stage = Math.max(1, Number(word.wrongReviewStage || 1));
+      return '<span class="tag review">第 ' + stage + ' 次 · Day ' + dueDay + '</span>';
     }
 
-    function bindWrongActions() {
+    function bindWrongActions(visibleWords = []) {
       const lib = getCurrentLibrary();
+      const visibleIds = new Set(visibleWords.map(word => word.id));
+      const checkboxes = Array.from(document.querySelectorAll("[data-wrong-book-select]"));
+      const selectAll = document.getElementById("selectAllFilteredWrong");
+      const selectedCount = document.getElementById("wrongBulkSelectedCount");
+      const batchAddButton = document.getElementById("batchAddWrongPoolBtn");
+      const batchRemoveButton = document.getElementById("batchRemoveWrongPoolBtn");
+      const getSelectedVisibleIds = () => Array.from(selectedWrongBookWordIds).filter(id => visibleIds.has(id));
+      const refreshSelectionUi = () => {
+        const count = getSelectedVisibleIds().length;
+        if (selectedCount) selectedCount.textContent = "已选择 " + count + " 个";
+        if (batchAddButton) batchAddButton.disabled = count === 0;
+        if (batchRemoveButton) batchRemoveButton.disabled = count === 0;
+        if (selectAll) {
+          selectAll.checked = checkboxes.length > 0 && checkboxes.every(input => input.checked);
+          selectAll.indeterminate = checkboxes.some(input => input.checked) && !selectAll.checked;
+        }
+      };
+      checkboxes.forEach(input => {
+        input.onchange = () => {
+          if (input.checked) selectedWrongBookWordIds.add(input.dataset.wrongBookSelect);
+          else selectedWrongBookWordIds.delete(input.dataset.wrongBookSelect);
+          refreshSelectionUi();
+        };
+      });
+      if (selectAll) {
+        selectAll.onchange = () => {
+          checkboxes.forEach(input => {
+            input.checked = selectAll.checked;
+            if (selectAll.checked) selectedWrongBookWordIds.add(input.dataset.wrongBookSelect);
+            else selectedWrongBookWordIds.delete(input.dataset.wrongBookSelect);
+          });
+          refreshSelectionUi();
+        };
+      }
+      if (batchAddButton) {
+        batchAddButton.onclick = () => batchUpdateWrongPool(getSelectedVisibleIds(), true);
+      }
+      if (batchRemoveButton) {
+        batchRemoveButton.onclick = () => batchUpdateWrongPool(getSelectedVisibleIds(), false);
+      }
       document.querySelectorAll("[data-toggle-pending]").forEach(button => {
         button.onclick = () => {
           const word = getWordById(lib, button.dataset.togglePending);
@@ -3886,6 +4163,51 @@
       document.querySelectorAll("[data-wrong-count]").forEach(input => {
         input.onchange = () => manualUpdateWrongPool(input.dataset.wrongCount, { wrongCount: input.value });
       });
+      refreshSelectionUi();
+    }
+
+    function batchUpdateWrongPool(wordIds, isPendingWrong) {
+      const lib = getCurrentLibrary();
+      const ids = uniqueWordIds(wordIds || []);
+      if (!ids.length) return;
+      let changedCount = 0;
+      ids.forEach(id => {
+        const word = getWordById(lib, id);
+        if (!word || word.isPendingWrong === isPendingWrong) return;
+        if (isPendingWrong && getWrongReviewDueDay(word) != null) {
+          word.manualReviewPracticePending = true;
+        } else if (!isPendingWrong) {
+          word.manualReviewPracticePending = false;
+        }
+        word.isPendingWrong = isPendingWrong;
+        if (isPendingWrong && word.wrongCount === 0) {
+          word.wrongCount = 1;
+          word.lastWrongDay = word.lastWrongDay || Math.max(1, getNextDayNumber(lib) - 1);
+          word.lastWrongDate = word.lastWrongDate || todayDate();
+        }
+        applyWrongFlags(word);
+        changedCount += 1;
+      });
+      if (!changedCount) {
+        alert(isPendingWrong ? "所选单词已经都在错词池中。" : "所选单词已经都不在错词池中。");
+        return;
+      }
+      lib.updatedAt = new Date().toISOString();
+      saveData();
+      selectedWrongBookWordIds.clear();
+      if (window.cloudSync && typeof window.cloudSync.requestAutoUploadLocalData === "function") {
+        window.cloudSync.requestAutoUploadLocalData(isPendingWrong ? "wrong-pool-batch-add" : "wrong-pool-batch-remove");
+      }
+      if (lib.currentDraftTask) {
+        const rebuild = confirm("已更新 " + changedCount + " 个词的错词池状态。今日任务已经生成，是否按最新错词池重新生成今日任务？这不会增加 Day，也不会写入记录。");
+        if (rebuild) {
+          viewName = "today";
+          renderNav();
+          regenerateTodayTaskFromSettings({ skipConfirm: true });
+          return;
+        }
+      }
+      renderWrongBook();
     }
 
     function renderManualTab(tab) {
@@ -4592,9 +4914,11 @@
 
     function getWordSourcesForTask(task, wordId) {
       const sources = [];
+      const isSupplement = (task?.supplementReviewWordIds || []).includes(wordId);
       if ((task?.newWordIds || []).includes(wordId)) sources.push("new");
       if ((task?.pendingWrongWordIds || []).includes(wordId)) sources.push("wrong");
-      if ((task?.delayedReviewWordIds || []).includes(wordId)) sources.push("review");
+      if ((task?.delayedReviewWordIds || []).includes(wordId) && !isSupplement) sources.push("review");
+      if (isSupplement) sources.push("supplement");
       if ((task?.wrongReviewWordIds || []).includes(wordId)) sources.push("review");
       if (!sources.length && task?.sourceMap?.[wordId]) {
         task.sourceMap[wordId].forEach(source => {
@@ -4612,9 +4936,11 @@
 
     function getWordSourceLabelForRecord(record, wordId) {
       const sources = [];
+      const isSupplement = (record.supplementReviewWordIds || []).includes(wordId);
       if ((record.newWordIds || []).includes(wordId)) sources.push("new");
       if ((record.pendingWrongWordIds || []).includes(wordId)) sources.push("wrong");
-      if ((record.delayedReviewWordIds || []).includes(wordId)) sources.push("review");
+      if ((record.delayedReviewWordIds || []).includes(wordId) && !isSupplement) sources.push("review");
+      if (isSupplement) sources.push("supplement");
       if ((record.wrongReviewWordIds || []).includes(wordId)) sources.push("review");
       if (!sources.length && record.sourceMap?.[wordId]) {
         record.sourceMap[wordId].forEach(source => {
@@ -4865,7 +5191,7 @@
             <div class="row between">
               <div>
                 <h2>设置</h2>
-                <div class="small muted">这些设置只影响当前词库。当天新词数只控制每天新释放的新词；当天到期复查数只控制每天从到期错词复查队列中取出的词。一次就写对的词不会进入 15 天复查；只有曾经错过并写对退出错题池的词，才会在设定天数后复查。</div>
+                <div class="small muted">这些设置只影响当前词库。当天新词数只控制每天新释放的新词；当天错词复查数是每天复查的目标数量。开启自动补充后，真正到期的词不足时，会优先补入最近将到期和最久未复查的历史错词。</div>
               </div>
             </div>
           </section>
@@ -4876,7 +5202,7 @@
               <label>当天新词数
                 <input data-setting="dailyTargetWords" type="number" min="0" max="100" step="5" value="${escapeHtml(s.dailyTargetWords ?? 30)}">
               </label>
-              <label>当天到期复查数
+              <label>当天错词复查数（目标）
                 <input data-setting="dailyReviewWords" type="number" min="0" max="100" step="5" value="${escapeHtml(s.dailyReviewWords ?? 30)}">
               </label>
               <label>延迟复查天数
@@ -4889,6 +5215,10 @@
             <label class="checkbox-row" style="margin-top:2px">
               <input data-setting="pauseNewWords" type="checkbox" ${s.pauseNewWords ? "checked" : ""}>
               暂停新词
+            </label>
+            <label class="checkbox-row" style="margin-top:8px">
+              <input data-setting="autoFillReviewWords" type="checkbox" ${s.autoFillReviewWords ? "checked" : ""}>
+              到期复查不足时，自动补充历史错词
             </label>
           </section>
 
