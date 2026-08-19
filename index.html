@@ -3602,7 +3602,6 @@
       else if (viewName === "today") renderTodayView();
       else if (viewName === "wrong") renderWrongBook();
       else if (viewName === "stats") renderStatistics();
-      else if (viewName === "settings") renderSettings();
       else if (viewName === "tools") renderTools();
     }
 
@@ -3612,7 +3611,6 @@
         ["wrong", "错词本"],
         ["library", "词库"],
         ["stats", "统计"],
-        ["settings", "设置"],
         ["tools", "工具"]
       ];
       document.getElementById("mainNav").innerHTML = navItems.map(item => {
@@ -3957,6 +3955,11 @@
 
       if (activeMode === "summary" && todaySummary) {
         app.innerHTML = renderSummary(lib, todaySummary);
+        // 提交完这一次之后，直接在结果页下方给出"下一次听写"的学习计划，
+        // 用户可以当场调整，不用再切到别的页面
+        const summaryGrid = app.querySelector(".grid");
+        if (summaryGrid) summaryGrid.insertAdjacentHTML("beforeend", renderStudyPlanSection(lib, "summary"));
+        bindStudyPlanEvents("summary");
         document.getElementById("newTaskAfterSummary").onclick = () => {
           todaySummary = null;
           renderTodayView("intro");
@@ -4026,9 +4029,11 @@
           `}
 
           ${task ? renderTaskPanel(lib, task, activeMode) : renderNoTaskPanel(lib)}
+          ${renderStudyPlanSection(lib, activeMode)}
         </div>
       `;
 
+      bindStudyPlanEvents(activeMode);
       document.getElementById("buildTaskBtn").onclick = () => startDictation();
       const regenerateButton = document.getElementById("regenerateTaskBtn");
       if (regenerateButton) regenerateButton.onclick = () => regenerateTodayTaskFromSettings();
@@ -4057,6 +4062,129 @@
       if (!task) return;
       task.currentIndex = Math.max(0, Number(dictationIndex || 0));
       saveData();
+    }
+
+    // ── 学习计划（由原「设置」页迁移到今日听写页）────────────────────────────────
+    // 迁移原因：学习计划决定的就是"下一次听写听多少词"，放在独立的设置页时，改完必须
+    // 回到今日页、再手动点一次"按当前设置重新生成"才生效，用户会误以为改动没起作用。
+    // 放到今日页后按下面的规则即时生效：
+    //   - 任务还没生成：直接刷新预计数量（renderNoTaskPanel 每次都会重新计算）
+    //   - 任务已生成但一个词都没答：静默重算，不打断
+    //   - 已经开始答题（currentIndex > 0）或已进入统一标记页：先弹窗确认，避免默默丢进度
+    // studyPlanOpen 记住用户手动展开/收起的选择，因为改动设置会触发 renderApp() 整页重绘。
+    let studyPlanOpen = null;
+
+    function isStudyPlanOpen(activeMode) {
+      if (studyPlanOpen !== null) return studyPlanOpen;
+      return activeMode === "intro" || activeMode === "summary";
+    }
+
+    function isDictationStarted(task, activeMode) {
+      if (!task) return false;
+      return Number(task.currentIndex || 0) > 0 || activeMode === "mark";
+    }
+
+    function renderStudyPlanSection(lib, activeMode) {
+      if (!lib || !lib.words.length) return "";
+      const s = lib.settings;
+      const started = isDictationStarted(lib.currentDraftTask, activeMode);
+      return `
+        <section class="card span-12 collapsible-section study-plan-section${isStudyPlanOpen(activeMode) ? " is-open" : ""}">
+          <button class="section-toggle" type="button">
+            <div class="section-toggle-info">
+              <span class="section-toggle-title">学习计划</span>
+              <span class="section-toggle-desc">只影响当前词库，改完立即用于下一次听写</span>
+            </div>
+            <span class="section-toggle-arrow">▾</span>
+          </button>
+          <div class="section-body">
+            <div class="settings-plan-grid">
+              <label>当天新词数
+                <input data-plan-setting="dailyTargetWords" type="number" min="0" max="100" step="5" value="${escapeHtml(s.dailyTargetWords ?? 30)}">
+              </label>
+              <label>当天错词复查数（目标）
+                <input data-plan-setting="dailyReviewWords" type="number" min="0" max="100" step="5" value="${escapeHtml(s.dailyReviewWords ?? 30)}">
+              </label>
+              <label>延迟复查天数
+                <input data-plan-setting="reviewDelayDays" type="number" min="1" max="365" step="1" value="${escapeHtml(s.reviewDelayDays)}">
+              </label>
+              <label>错词移出错词池次数
+                <input data-plan-setting="correctTimesToExitWrongPool" type="number" min="1" max="10" step="1" value="${escapeHtml(s.correctTimesToExitWrongPool)}">
+              </label>
+            </div>
+            <div class="settings-toggle-row">
+              <label class="checkbox-row">
+                <input data-plan-setting="pauseNewWords" type="checkbox" ${s.pauseNewWords ? "checked" : ""}>
+                暂停新词
+              </label>
+              <label class="checkbox-row">
+                <input data-plan-setting="autoFillReviewWords" type="checkbox" ${s.autoFillReviewWords ? "checked" : ""}>
+                到期复查不足时，自动补充历史错词
+              </label>
+            </div>
+            <div class="small muted" style="margin-top:8px">
+              当天新词数只控制每天新释放的新词；当天错词复查数是每天复查的目标数量。开启自动补充后，真正到期的词不足时，会优先补入最近将到期和最久未复查的历史错词。
+            </div>
+            <div class="notice small">${started
+              ? "今日任务已经开始答题，修改后会先询问是否按新计划重新生成。"
+              : "修改后立即生效，用于下一次生成的听写任务。"}</div>
+          </div>
+        </section>
+      `;
+    }
+
+    function collectStudyPlanUpdates() {
+      const updates = {};
+      document.querySelectorAll("[data-plan-setting]").forEach(input => {
+        const key = input.dataset.planSetting;
+        if (input.type === "checkbox") updates[key] = input.checked;
+        else updates[key] = Number(input.value);
+      });
+      if ("dailyTargetWords" in updates) {
+        updates.dailyTargetWords = clampNumber(updates.dailyTargetWords, 0, 100, 30);
+      }
+      if ("dailyReviewWords" in updates) {
+        updates.dailyReviewWords = clampNumber(updates.dailyReviewWords, 0, 100, 30);
+      }
+      updates.countMode = "split-new-review";
+      return updates;
+    }
+
+    async function handleStudyPlanChange(activeMode) {
+      const lib = getCurrentLibrary();
+      if (!lib) return;
+      const started = isDictationStarted(lib.currentDraftTask, activeMode);
+      if (started) {
+        const ok = await requestAppConfirmation(
+          "学习计划已修改。今日任务已经开始答题，按新计划重新生成会清空当前的答题进度。确定重新生成吗？"
+        );
+        // 用户放弃：重绘把表单恢复成已保存的值，不写入任何改动
+        if (!ok) {
+          renderApp();
+          return;
+        }
+      }
+      const hadTask = Boolean(lib.currentDraftTask);
+      // updateLibrarySettings 内部会 saveData + 触发自动上传 + renderApp()，
+      // 没有生成任务时这一步就已经让"预计词数"跟着新计划刷新了。
+      updateLibrarySettings(collectStudyPlanUpdates());
+      if (hadTask) await regenerateTodayTaskFromSettings({ skipConfirm: true });
+    }
+
+    function bindStudyPlanEvents(activeMode) {
+      const section = document.querySelector(".study-plan-section");
+      if (!section) return;
+      const toggle = section.querySelector(".section-toggle");
+      if (toggle) {
+        toggle.onclick = () => {
+          section.classList.toggle("is-open");
+          studyPlanOpen = section.classList.contains("is-open");
+        };
+      }
+      // 用 change 而不是 input：数字框在输入过程中不会被整页重绘打断，失焦/回车才提交
+      section.querySelectorAll("[data-plan-setting]").forEach(input => {
+        input.onchange = () => handleStudyPlanChange(activeMode);
+      });
     }
 
     function renderNoTaskPanel(lib) {
@@ -5809,54 +5937,14 @@
       downloadCsv(rows, lib.libraryName + "_" + label + "_错词.csv");
     }
 
+    // 「设置」页已取消：学习计划移到今日听写页（改完立刻作用于下一次听写），
+    // 播放设置并入这里，和云端同步/数据备份/手动校准/危险操作一起归到「工具」。
     function renderTools() {
-      renderSettings({ toolsOnly: true });
-    }
-
-    function renderSettings(options = {}) {
-      const toolsOnly = Boolean(options.toolsOnly);
       const lib = getCurrentLibrary();
       const s = lib.settings;
       document.getElementById("app").innerHTML = `
         <div class="grid">
-          <section class="card span-12 settings-only-section">
-            <div class="row between">
-              <div>
-                <h2>设置</h2>
-                <div class="small muted">这些设置只影响当前词库。当天新词数只控制每天新释放的新词；当天错词复查数是每天复查的目标数量。开启自动补充后，真正到期的词不足时，会优先补入最近将到期和最久未复查的历史错词。</div>
-              </div>
-            </div>
-          </section>
-
-          <section class="card span-12 settings-only-section">
-            <h3>学习计划</h3>
-            <div class="settings-plan-grid">
-              <label>当天新词数
-                <input data-setting="dailyTargetWords" type="number" min="0" max="100" step="5" value="${escapeHtml(s.dailyTargetWords ?? 30)}">
-              </label>
-              <label>当天错词复查数（目标）
-                <input data-setting="dailyReviewWords" type="number" min="0" max="100" step="5" value="${escapeHtml(s.dailyReviewWords ?? 30)}">
-              </label>
-              <label>延迟复查天数
-                <input data-setting="reviewDelayDays" type="number" min="1" max="365" step="1" value="${escapeHtml(s.reviewDelayDays)}">
-              </label>
-              <label>错词移出错词池次数
-                <input data-setting="correctTimesToExitWrongPool" type="number" min="1" max="10" step="1" value="${escapeHtml(s.correctTimesToExitWrongPool)}">
-              </label>
-            </div>
-            <div class="settings-toggle-row">
-              <label class="checkbox-row">
-                <input data-setting="pauseNewWords" type="checkbox" ${s.pauseNewWords ? "checked" : ""}>
-                暂停新词
-              </label>
-              <label class="checkbox-row">
-                <input data-setting="autoFillReviewWords" type="checkbox" ${s.autoFillReviewWords ? "checked" : ""}>
-                到期复查不足时，自动补充历史错词
-              </label>
-            </div>
-          </section>
-
-          <section class="card span-12 settings-only-section">
+          <section class="card span-12 playback-settings-section">
             <h3>播放设置</h3>
             <div class="grid" style="gap:8px">
               <label class="span-4">播放顺序
@@ -5982,29 +6070,24 @@
         </div>
       `;
       const app = document.getElementById("app");
-      if (toolsOnly) {
-        app.querySelectorAll(".settings-only-section").forEach(section => section.remove());
-        const toolsGrid = app.querySelector(".grid");
-        if (toolsGrid) {
-          toolsGrid.insertAdjacentHTML("afterbegin", `
-            <section class="card span-12 tool-page-intro">
-              <h2>工具</h2>
-              <div class="small muted">云端同步、数据备份、历史补录与危险操作都集中在这里。日常听写不需要使用。</div>
-            </section>
-          `);
-        }
-        document.querySelectorAll("[data-manual-tab]").forEach(button => {
-          button.onclick = () => renderManualTab(button.dataset.manualTab);
-        });
-        renderManualTab("batch");
-        bindStatisticsBackupEvents(lib);
-        setupToolsSections();
-        if (window.cloudSync && typeof window.cloudSync.mount === "function") {
-          window.cloudSync.mount();
-        }
-        return;
+      const toolsGrid = app.querySelector(".grid");
+      if (toolsGrid) {
+        toolsGrid.insertAdjacentHTML("afterbegin", `
+          <section class="card span-12 tool-page-intro">
+            <h2>工具</h2>
+            <div class="small muted">播放设置、云端同步、数据备份、历史补录与危险操作都集中在这里。学习计划已移到「今日听写」页。</div>
+          </section>
+        `);
       }
-      app.querySelectorAll(".collapsible-section").forEach(section => section.remove());
+      document.querySelectorAll("[data-manual-tab]").forEach(button => {
+        button.onclick = () => renderManualTab(button.dataset.manualTab);
+      });
+      renderManualTab("batch");
+      bindStatisticsBackupEvents(lib);
+      setupToolsSections();
+      if (window.cloudSync && typeof window.cloudSync.mount === "function") {
+        window.cloudSync.mount();
+      }
       const settingsVoiceValue = document.getElementById("settingsSpeechVoiceValue");
       document.querySelectorAll('[data-speech-voice-scope="settings"]').forEach(button => {
         button.onclick = () => {
@@ -6012,6 +6095,7 @@
           updateSpeechVoiceButtonStates("settings", settingsVoiceValue?.value || "google-us");
         };
       });
+      // 这里只剩播放设置（学习计划已迁到今日听写页，改动即时生效、不再走这个保存按钮）
       document.getElementById("saveSettingsBtn").onclick = () => {
         const updates = {};
         document.querySelectorAll("[data-setting]").forEach(input => {
@@ -6020,15 +6104,8 @@
           else if (["playOrder", "speechVoiceName"].includes(key)) updates[key] = input.value;
           else updates[key] = Number(input.value);
         });
-        if ("dailyTargetWords" in updates) {
-          updates.dailyTargetWords = clampNumber(updates.dailyTargetWords, 0, 100, 30);
-        }
-        if ("dailyReviewWords" in updates) {
-          updates.dailyReviewWords = clampNumber(updates.dailyReviewWords, 0, 100, 30);
-        }
-        updates.countMode = "split-new-review";
         updateLibrarySettings(updates);
-        alert("设置已保存。");
+        alert("播放设置已保存。");
       };
       document.getElementById("testSpeechBtn").onclick = () => {
         const previousVoice = lib.settings.speechVoiceName;
